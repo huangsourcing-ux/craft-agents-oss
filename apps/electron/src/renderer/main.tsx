@@ -8,21 +8,18 @@ import App from './App'
 import { ThemeProvider } from './context/ThemeContext'
 import { windowWorkspaceIdAtom } from './atoms/sessions'
 import { Toaster } from '@/components/ui/sonner'
-import { setupI18n, i18n } from '@craft-agent/shared/i18n'
+import { DEFAULT_UI_LANGUAGE, setupI18n, i18n } from '@craft-agent/shared/i18n'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 import './index.css'
 
 // Initialize i18n before any React rendering
 setupI18n([LanguageDetector, initReactI18next])
+void i18n.changeLanguage(DEFAULT_UI_LANGUAGE)
 
-// One-shot bootstrap: ensure the main process's i18n + preferences.json learn
-// the language we just restored from localStorage. The main-process IPC handler
-// validates the code and persists idempotently, so this is safe to run on every
-// renderer startup. Without this push, a freshly-installed (or freshly-upgraded)
-// app would still generate titles in English until the user manually re-picks
-// the language in Appearance.
-const resolvedLanguage = i18n.resolvedLanguage
+// One-shot bootstrap: ensure the main process's i18n + preferences.json are
+// forced to the package default language on every renderer startup.
+const resolvedLanguage = DEFAULT_UI_LANGUAGE
 // Diagnostic: console-log the bootstrap push so it shows up in DevTools and
 // (via captureConsoleIntegration) in Sentry, alongside the main-process
 // [i18n] startup hydration log. If these two diverge, the renderer's

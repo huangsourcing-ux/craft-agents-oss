@@ -17,13 +17,25 @@ const JWT_EXPIRY_SECONDS = 86_400 // 24 hours
 
 export interface JwtPayload {
   sub: string
+  username?: string
+  workspace_id?: string
   iat: number
   exp: number
 }
 
+export interface SessionUser {
+  id: string
+  username: string
+  displayName?: string
+}
+
 export async function signJwt(payload: JwtPayload, secret: string): Promise<string> {
   const key = new TextEncoder().encode(secret)
-  return new SignJWT({ sub: payload.sub } as Record<string, unknown>)
+  return new SignJWT({
+    sub: payload.sub,
+    username: payload.username,
+    workspace_id: payload.workspace_id,
+  } as Record<string, unknown>)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt(payload.iat)
     .setExpirationTime(payload.exp)
@@ -36,6 +48,8 @@ export async function verifyJwt(token: string, secret: string): Promise<JwtPaylo
     const { payload } = await jwtVerify(token, key, { algorithms: ['HS256'] })
     return {
       sub: payload.sub as string,
+      username: typeof payload.username === 'string' ? payload.username : undefined,
+      workspace_id: typeof payload.workspace_id === 'string' ? payload.workspace_id : undefined,
       iat: payload.iat as number,
       exp: payload.exp as number,
     }
@@ -44,9 +58,26 @@ export async function verifyJwt(token: string, secret: string): Promise<JwtPaylo
   }
 }
 
-export async function createSessionToken(secret: string): Promise<string> {
+export async function createSessionToken(
+  secret: string,
+  options?: {
+    user?: SessionUser
+    workspaceId?: string | null
+  },
+): Promise<{ token: string; expiresAt: string }> {
   const now = Math.floor(Date.now() / 1000)
-  return signJwt({ sub: 'webui', iat: now, exp: now + JWT_EXPIRY_SECONDS }, secret)
+  const exp = now + JWT_EXPIRY_SECONDS
+  const token = await signJwt({
+    sub: options?.user?.id ?? 'webui',
+    username: options?.user?.username,
+    workspace_id: options?.workspaceId ?? undefined,
+    iat: now,
+    exp,
+  }, secret)
+  return {
+    token,
+    expiresAt: new Date(exp * 1000).toISOString(),
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -173,11 +173,26 @@ function assembleResources(config: ServerBuildConfig): void {
   }
 
   // Also copy session-mcp-server from packages/ build output (dev path fallback)
-  const sessionServerDist = join(config.rootDir, 'packages', 'session-mcp-server', 'dist', 'index.js');
+  const sessionServerDist = join(config.rootDir, 'packages', 'session-mcp-server', 'dist', 'index.mjs');
   if (existsSync(sessionServerDist)) {
     const destSessionServer = join(destResources, 'session-mcp-server');
     mkdirSync(destSessionServer, { recursive: true });
-    copyFileSync(sessionServerDist, join(destSessionServer, 'index.js'));
+    copyFileSync(sessionServerDist, join(destSessionServer, 'index.mjs'));
+  }
+
+  const piServerDist = join(config.rootDir, 'packages', 'pi-agent-server', 'dist', 'index.mjs');
+  if (existsSync(piServerDist)) {
+    const destPiServer = join(destResources, 'pi-agent-server');
+    mkdirSync(destPiServer, { recursive: true });
+    copyFileSync(piServerDist, join(destPiServer, 'index.mjs'));
+  }
+
+  const webuiDist = join(config.rootDir, 'apps', 'webui', 'dist');
+  if (existsSync(webuiDist)) {
+    console.log('  Copying WebUI assets...');
+    cpSync(webuiDist, join(outputDir, 'apps', 'webui', 'dist'), { recursive: true });
+  } else {
+    console.warn(`  Warning: WebUI dist not found at ${webuiDist}. Browser UI will be disabled.`);
   }
 }
 
@@ -306,6 +321,65 @@ function copyDependencyTree(
   }
 }
 
+function collectPackageJsonFiles(root: string): string[] {
+  const files: string[] = [];
+
+  function walk(dir: string): void {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === '.bin') continue;
+        walk(full);
+      } else if (entry.isFile() && entry.name === 'package.json') {
+        files.push(full);
+      }
+    }
+  }
+
+  walk(root);
+  return files;
+}
+
+function dependencyNamesFromPackageJson(pkgPath: string): string[] {
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+    const names = new Set<string>();
+    for (const section of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
+      for (const [dep, version] of Object.entries(pkg[section] || {}) as [string, string][]) {
+        if (typeof version === 'string' && version.startsWith('workspace:')) continue;
+        if (dep.startsWith('@craft-agent/')) continue;
+        names.add(dep);
+      }
+    }
+    return [...names];
+  } catch {
+    return [];
+  }
+}
+
+function copyNestedMissingDeps(srcModules: string, destModules: string, copied: Set<string>): void {
+  let added = 0;
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const pkgJsonPath of collectPackageJsonFiles(destModules)) {
+      for (const dep of dependencyNamesFromPackageJson(pkgJsonPath)) {
+        if (copied.has(dep)) continue;
+        if (!existsSync(join(srcModules, dep))) continue;
+        copyDependencyTree(dep, srcModules, destModules, copied);
+        added += 1;
+        changed = true;
+      }
+    }
+  }
+
+  if (added > 0) {
+    console.log(`  Nested dependency scan: added ${added} packages`);
+  }
+}
+
 /**
  * Scan all .ts files in a directory tree for import/require statements
  * and return the set of external npm package names (not relative paths,
@@ -426,6 +500,8 @@ function copyProductionDeps(config: ServerBuildConfig): void {
     cpSync(src, join(destModules, dep), { recursive: true, dereference: true });
     copied.add(dep);
   }
+
+  copyNestedMissingDeps(srcModules, destModules, copied);
 
   console.log(`  Total: ${copied.size} packages copied to node_modules`);
 }
@@ -582,6 +658,7 @@ export CRAFT_BUNDLED_ASSETS_ROOT="$ROOT"
 export CRAFT_IS_PACKAGED=true
 export CRAFT_APP_ROOT="$ROOT"
 export CRAFT_RESOURCES_PATH="$ROOT/resources"
+export CRAFT_WEBUI_DIR="\${CRAFT_WEBUI_DIR:-$ROOT/apps/webui/dist}"
 
 # CLI tools (doc tools use uv + Python scripts)
 export CRAFT_UV="$ROOT/resources/bin/uv"
@@ -712,7 +789,7 @@ echo ""
 function createDockerFiles(config: ServerBuildConfig): void {
   const { outputDir, version } = config;
 
-  const dockerfile = `FROM oven/bun:1.3-slim
+  const dockerfile = `FROM node:22-slim
 
 WORKDIR /app
 
@@ -721,16 +798,20 @@ COPY . .
 
 # Make binaries executable
 RUN chmod +x bin/craft-server vendor/bun/bun resources/bin/uv && \\
-    for f in resources/bin/*; do [ -f "$f" ] && chmod +x "$f"; done
+    for f in resources/bin/*; do [ -f "$f" ] && chmod +x "$f"; done && \\
+    mkdir -p /home/craftagents/.craft-agent
 
+ENV HOME=/home/craftagents
 ENV CRAFT_IS_PACKAGED=true
 ENV CRAFT_BUNDLED_ASSETS_ROOT=/app
 ENV CRAFT_APP_ROOT=/app
 ENV CRAFT_RESOURCES_PATH=/app/resources
+ENV CRAFT_WEBUI_DIR=/app/apps/webui/dist
 ENV CRAFT_UV=/app/resources/bin/uv
 ENV CRAFT_SCRIPTS=/app/resources/scripts
 ENV CRAFT_RPC_HOST=0.0.0.0
 ENV CRAFT_RPC_PORT=9100
+ENV CRAFT_BACKEND_NODE_BIN=node
 ENV PATH="/app/resources/bin:/app/vendor/bun:\${PATH}"
 
 EXPOSE 9100
@@ -860,6 +941,9 @@ async function main(): Promise<void> {
   // The bundle embeds Baileys + transitive deps; see scripts/build-wa-worker.ts.
   console.log('  Building WhatsApp worker bundle...');
   await $`bun run ${join(rootDir, 'scripts', 'build-wa-worker.ts')}`.cwd(rootDir);
+
+  console.log('  Building WebUI assets...');
+  await $`bun run build`.cwd(join(rootDir, 'apps', 'webui'));
 
   // Step 5: Assemble resources
   console.log('\n[5/8] Assembling resources...');

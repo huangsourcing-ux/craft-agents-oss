@@ -13,6 +13,7 @@ import type { AgentEvent, Effect } from './event-processor'
 import { AppShell } from '@/components/app-shell/AppShell'
 import type { AppShellContextType } from '@/context/AppShellContext'
 import { OnboardingWizard, ReauthScreen } from '@/components/onboarding'
+import { LoginScreen } from '@/components/auth/LoginScreen'
 import { WorkspacePicker } from '@/components/workspace'
 import { ResetConfirmationDialog } from '@/components/ResetConfirmationDialog'
 import { SplashScreen } from '@/components/SplashScreen'
@@ -73,8 +74,26 @@ import { getFileManagerName } from '@/lib/platform'
 import { rendererLog } from '@/lib/logger'
 import { ActionRegistryProvider } from '@/actions'
 import { toast } from 'sonner'
+import { authClient, type EmployeeAuthSession, type EmployeeLoginCredentials } from '@/lib/auth-client'
+import { isManagedLlmMode, MANAGED_LLM_SETUP_NEEDS } from '@/lib/managed-llm'
 
-type AppState = 'loading' | 'onboarding' | 'reauth' | 'workspace-picker' | 'ready'
+type AppState = 'loading' | 'login' | 'onboarding' | 'reauth' | 'workspace-picker' | 'ready'
+
+function employeeWorkspaceSlug(session: EmployeeAuthSession): string {
+  const base = `employee-${session.workspaceId}`
+  return base.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80)
+}
+
+function employeeWorkspaceName(session: EmployeeAuthSession): string {
+  return `${session.user.displayName || session.user.username} (${session.workspaceId})`
+}
+
+function authGatewayWsUrl(serverUrl: string, workspaceId: string): string {
+  const url = new URL(serverUrl)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  url.searchParams.set('workspaceId', workspaceId)
+  return url.toString()
+}
 
 /** Type for the Jotai store returned by useStore() */
 type JotaiStore = ReturnType<typeof getDefaultStore>
@@ -651,38 +670,93 @@ export default function App() {
     setShowResetDialog(true)
   }, [])
 
-  // Check auth state and get window's workspace ID on mount
-  useEffect(() => {
-    const initialize = async () => {
-      try {
-        // Get this window's workspace ID (passed via URL query param from main process)
-        const wsId = await window.electronAPI.getWindowWorkspace()
-        setWindowWorkspaceId(wsId)
+  const ensureEmployeeRemoteWorkspace = useCallback(async (session: EmployeeAuthSession): Promise<string> => {
+    const slug = employeeWorkspaceSlug(session)
+    const remoteServer = {
+      url: authGatewayWsUrl(session.serverUrl, session.workspaceId),
+      token: session.token,
+      remoteWorkspaceId: session.workspaceId,
+    }
+    const existingWorkspaces = await window.electronAPI.getWorkspaces()
+    const existing = existingWorkspaces.find((workspace) =>
+      workspace.remoteServer?.remoteWorkspaceId === session.workspaceId ||
+      workspace.slug === slug
+    )
 
-        const needs = await window.electronAPI.getSetupNeeds()
-        setSetupNeeds(needs)
+    let workspaceId: string
+    if (existing) {
+      await window.electronAPI.updateWorkspaceRemoteServer(existing.id, remoteServer)
+      workspaceId = existing.id
+    } else {
+      const { path } = await window.electronAPI.checkWorkspaceSlug(slug)
+      const workspace = await window.electronAPI.createWorkspace(path, employeeWorkspaceName(session), remoteServer)
+      workspaceId = workspace.id
+    }
 
-        if (needs.isFullyConfigured) {
-          // If no workspace is selected (thin client without CRAFT_WORKSPACE_ID),
-          // show workspace picker before entering the main app
-          if (!wsId) {
-            setAppState('workspace-picker')
-          } else {
-            setAppState('ready')
-          }
+    await window.electronAPI.switchWorkspace(workspaceId)
+    const updatedWorkspaces = await window.electronAPI.getWorkspaces()
+    setWorkspaces(updatedWorkspaces)
+    return workspaceId
+  }, [])
+
+  const initializeAfterEmployeeAuth = useCallback(async (employeeSession?: EmployeeAuthSession) => {
+    try {
+      // Get this window's workspace ID (passed via URL query param from main process)
+      const wsId = employeeSession
+        ? await ensureEmployeeRemoteWorkspace(employeeSession)
+        : await window.electronAPI.getWindowWorkspace()
+      setWindowWorkspaceId(wsId)
+
+      if (employeeSession && isManagedLlmMode()) {
+        // [FORK] Employee deployments use a server-owned OpenRouter connection,
+        // so local model/account onboarding must not block the remote workspace.
+        setSetupNeeds(MANAGED_LLM_SETUP_NEEDS)
+        setAppState(wsId ? 'ready' : 'workspace-picker')
+        return
+      }
+
+      const needs = await window.electronAPI.getSetupNeeds()
+      setSetupNeeds(needs)
+
+      if (needs.isFullyConfigured) {
+        // If no workspace is selected (thin client without CRAFT_WORKSPACE_ID),
+        // show workspace picker before entering the main app
+        if (!wsId) {
+          setAppState('workspace-picker')
         } else {
-          // New user or needs setup - show onboarding
-          setAppState('onboarding')
+          setAppState('ready')
         }
-      } catch (error) {
-        console.error('Failed to check auth state:', error)
-        // If check fails, show onboarding to be safe
+      } else {
+        // New user or needs setup - show onboarding
         setAppState('onboarding')
       }
+    } catch (error) {
+      console.error('Failed to check auth state:', error)
+      // If check fails, show onboarding to be safe
+      setAppState('onboarding')
+    }
+  }, [ensureEmployeeRemoteWorkspace, setWindowWorkspaceId])
+
+  const handleEmployeeLogin = useCallback(async (credentials: EmployeeLoginCredentials) => {
+    const session = await authClient.login(credentials)
+    setAppState('loading')
+    await initializeAfterEmployeeAuth(session)
+  }, [initializeAfterEmployeeAuth])
+
+  // Check employee auth state, then get window's workspace ID on mount.
+  useEffect(() => {
+    const initialize = async () => {
+      const session = await authClient.getSession()
+      if (!session) {
+        setAppState('login')
+        return
+      }
+
+      await initializeAfterEmployeeAuth(session)
     }
 
     initialize()
-  }, [])
+  }, [initializeAfterEmployeeAuth])
 
   // Session selection state
   const [sessionSelection, setSession] = useSession()
@@ -1675,6 +1749,7 @@ export default function App() {
   // Execute reset after user confirms in dialog
   const executeReset = useCallback(async () => {
     try {
+      await authClient.logout()
       await window.electronAPI.logout()
       // Reset all state
       // Clear session atoms - initialize with empty array clears all per-session atoms
@@ -1689,13 +1764,13 @@ export default function App() {
       })
       // Reset onboarding hook state
       onboarding.reset()
-      setAppState('onboarding')
+      setAppState('login')
     } catch (error) {
       console.error('Reset failed:', error)
     } finally {
       setShowResetDialog(false)
     }
-  }, [onboarding, initializeSessions])
+  }, [onboarding, initializeSessions, setWindowWorkspaceId])
 
   // Handle workspace selection
   // - Default: switch workspace in same window (in-window switching)
@@ -1891,6 +1966,17 @@ export default function App() {
   // Loading state - show splash screen
   if (appState === 'loading') {
     return <SplashScreen isExiting={false} />
+  }
+
+  if (appState === 'login') {
+    return (
+      <DismissibleLayerProvider>
+        <ModalProvider>
+          <WindowCloseHandler />
+          <LoginScreen onLogin={handleEmployeeLogin} />
+        </ModalProvider>
+      </DismissibleLayerProvider>
+    )
   }
 
   // Reauth state - session expired, need to re-login

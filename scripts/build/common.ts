@@ -489,8 +489,8 @@ export function copyInterceptorBundle(config: BuildConfig): void {
 export function copySessionServer(config: BuildConfig): void {
   const { rootDir, electronDir } = config;
 
-  const sessionSource = join(rootDir, 'packages', 'session-mcp-server', 'dist', 'index.js');
-  const sessionDest = join(electronDir, 'resources', 'session-mcp-server', 'index.js');
+  const sessionSource = join(rootDir, 'packages', 'session-mcp-server', 'dist', 'index.mjs');
+  const sessionDest = join(electronDir, 'resources', 'session-mcp-server', 'index.mjs');
 
   if (!existsSync(sessionSource)) {
     console.warn(`Warning: Session server not found at ${sessionSource}. Session-scoped tools will not work.`);
@@ -523,16 +523,16 @@ export function copyPiAgentServer(config: BuildConfig): void {
   const piSourceDir = join(rootDir, 'packages', 'pi-agent-server', 'dist');
   const piDestDir = join(electronDir, 'resources', 'pi-agent-server');
 
-  if (!existsSync(join(piSourceDir, 'index.js'))) {
-    console.warn(`Warning: Pi agent server not found at ${piSourceDir}/index.js. Pi SDK sessions will not work.`);
+  if (!existsSync(join(piSourceDir, 'index.mjs'))) {
+    console.warn(`Warning: Pi agent server not found at ${piSourceDir}/index.mjs. Pi SDK sessions will not work.`);
     return;
   }
 
   console.log('Copying Pi Agent Server...');
   mkdirSync(piDestDir, { recursive: true });
 
-  // 1. Copy index.js
-  copyFileSync(join(piSourceDir, 'index.js'), join(piDestDir, 'index.js'));
+  // 1. Copy index.mjs
+  copyFileSync(join(piSourceDir, 'index.mjs'), join(piDestDir, 'index.mjs'));
 
   // 2. Copy koffi npm package (external import, resolved via node_modules at runtime)
   const koffiSource = join(rootDir, 'node_modules', 'koffi');
@@ -562,11 +562,11 @@ export function copyPiAgentServer(config: BuildConfig): void {
     mkdirSync(nativeDest, { recursive: true });
     cpSync(nativeSrc, nativeDest, { recursive: true });
     const size = lstatSync(join(nativeSrc, readdirSync(nativeSrc)[0])).size;
-    console.log(`  Copied index.js + koffi/${targetDir} (${(size / 1024 / 1024).toFixed(1)}MB)`);
+    console.log(`  Copied index.mjs + koffi/${targetDir} (${(size / 1024 / 1024).toFixed(1)}MB)`);
   } else {
     console.warn(`  Warning: koffi native binary not found for ${targetDir}`);
     cpSync(join(koffiSource, 'build'), join(koffiDest, 'build'), { recursive: true });
-    console.log('  Copied index.js + koffi (all platforms as fallback)');
+    console.log('  Copied index.mjs + koffi (all platforms as fallback)');
   }
 }
 
@@ -578,16 +578,16 @@ export function buildMcpServers(config: BuildConfig): void {
   const { rootDir } = config;
 
   const sessionDir = join(rootDir, 'packages', 'session-mcp-server');
-  const sessionOut = join(sessionDir, 'dist', 'index.js');
+  const sessionOut = join(sessionDir, 'dist', 'index.mjs');
   const piDir = join(rootDir, 'packages', 'pi-agent-server');
-  const piOut = join(piDir, 'dist', 'index.js');
+  const piOut = join(piDir, 'dist', 'index.mjs');
 
   console.log('Building MCP servers...');
 
   mkdirSync(join(sessionDir, 'dist'), { recursive: true });
 
   execSync(
-    `bun build ${join(sessionDir, 'src', 'index.ts')} --outfile ${sessionOut} --target node --format cjs`,
+    `bun build ${join(sessionDir, 'src', 'index.ts')} --outfile ${sessionOut} --target node --format esm`,
     { cwd: rootDir, stdio: 'inherit', shell: true }
   );
 
@@ -595,15 +595,15 @@ export function buildMcpServers(config: BuildConfig): void {
     throw new Error(`Session MCP server output not found at ${sessionOut}`);
   }
 
-  // Pi agent server uses --target=bun --format=esm because its Pi SDK deps are ESM-only.
-  // --target=node --format=cjs leaves ESM deps as external require() calls that fail at runtime.
+  // Pi agent server uses Node ESM because its dependencies rely on Node 22
+  // web APIs that Bun does not fully implement in the server container.
   // koffi is marked external because it's a native N-API module — bun can't inline .node binaries
   // and inlining its JS breaks the native binary resolution paths.
   // Optional: skip if package directory is missing (e.g., not synced to OSS).
   if (existsSync(join(piDir, 'src'))) {
     mkdirSync(join(piDir, 'dist'), { recursive: true });
     execSync(
-      `bun build ${join(piDir, 'src', 'index.ts')} --outdir ${join(piDir, 'dist')} --target bun --format esm --external koffi`,
+      `bun build ${join(piDir, 'src', 'index.ts')} --outfile ${piOut} --target node --format esm --external koffi`,
       { cwd: rootDir, stdio: 'inherit', shell: true }
     );
     if (!existsSync(piOut)) {
@@ -638,8 +638,8 @@ export function buildWhatsAppWorker(config: BuildConfig): void {
 export function verifyMcpServersExist(config: BuildConfig): void {
   const { electronDir } = config;
 
-  const sessionPath = join(electronDir, 'resources', 'session-mcp-server', 'index.js');
-  const piPath = join(electronDir, 'resources', 'pi-agent-server', 'index.js');
+  const sessionPath = join(electronDir, 'resources', 'session-mcp-server', 'index.mjs');
+  const piPath = join(electronDir, 'resources', 'pi-agent-server', 'index.mjs');
 
   if (!existsSync(sessionPath)) {
     throw new Error(`Session MCP server not found at ${sessionPath}`);

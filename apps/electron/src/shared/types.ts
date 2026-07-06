@@ -284,7 +284,7 @@ export interface ElectronAPI {
   getWindowMode(): Promise<string | null>
   openWorkspace(workspaceId: string): Promise<void>
   openSessionInNewWindow(workspaceId: string, sessionId: string): Promise<void>
-  switchWorkspace(workspaceId: string): Promise<void>
+  switchWorkspace(workspaceId: string): Promise<{ workspaceId: string; remoteServer?: { url: string; token: string; remoteWorkspaceId: string } | null } | void>
   closeWindow(): Promise<void>
   confirmCloseWindow(): Promise<void>
   /** Cancel a pending close request (renderer handled it by closing a modal/panel). */

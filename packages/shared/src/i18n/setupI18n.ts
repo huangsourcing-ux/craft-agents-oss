@@ -1,6 +1,6 @@
 import i18n, { type i18n as I18nInstance, type InitOptions } from "i18next";
 import { LOCALE_REGISTRY } from "./registry";
-import { SUPPORTED_LANGUAGE_CODES } from "./languages";
+import { DEFAULT_UI_LANGUAGE, SUPPORTED_LANGUAGE_CODES } from "./languages";
 
 // Build i18next resources from the locale registry.
 const resources = Object.fromEntries(
@@ -32,7 +32,8 @@ export function setupI18n(
 
   instance.init({
     resources,
-    fallbackLng: "en",
+    lng: DEFAULT_UI_LANGUAGE,
+    fallbackLng: DEFAULT_UI_LANGUAGE,
     supportedLngs: [...SUPPORTED_LANGUAGE_CODES],
     interpolation: { escapeValue: false },
     initImmediate: false, // synchronous init — resources are bundled inline

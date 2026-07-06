@@ -2,6 +2,8 @@ import { LOCALE_REGISTRY, type LanguageCode } from "./registry";
 
 export type { LanguageCode } from "./registry";
 
+export const DEFAULT_UI_LANGUAGE: LanguageCode = "zh-Hans";
+
 export interface LanguageConfig {
   nativeName: string;
 }

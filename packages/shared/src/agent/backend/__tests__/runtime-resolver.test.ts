@@ -37,6 +37,24 @@ describe('resolveServerPath fallback', () => {
     expect(paths.piServerPath).toBe(join(serverDir, 'index.js'));
   });
 
+  it('prefers ESM helper bundles when several Node bundle formats exist', () => {
+    const appRoot = join(tmpBase, 'app-esm');
+    const serverDir = join(appRoot, 'resources', 'pi-agent-server');
+    mkdirSync(serverDir, { recursive: true });
+    writeFileSync(join(serverDir, 'index.js'), '// js');
+    writeFileSync(join(serverDir, 'index.cjs'), '// cjs');
+    writeFileSync(join(serverDir, 'index.mjs'), '// mjs');
+
+    const hostRuntime: BackendHostRuntimeContext = {
+      appRootPath: appRoot,
+      resourcesPath: appRoot,
+      isPackaged: true,
+    };
+
+    const paths = resolveBackendRuntimePaths(hostRuntime);
+    expect(paths.piServerPath).toBe(join(serverDir, 'index.mjs'));
+  });
+
   it('prefers resources/ over dist/resources/ when both exist', () => {
     const appRoot = join(tmpBase, 'app2');
 

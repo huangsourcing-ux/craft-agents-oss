@@ -163,7 +163,7 @@ describe('preferences.uiLanguage', () => {
   });
 
   describe('resolveTitleLanguageName', () => {
-    it('returns undefined when no UI language is persisted (so titles auto-detect)', () => {
+    it('returns the default Chinese language when no UI language is persisted', () => {
       const { configDir } = setupDir();
       try {
         const r = runScript(configDir, `
@@ -171,7 +171,7 @@ describe('preferences.uiLanguage', () => {
           console.log(JSON.stringify({ value: resolveTitleLanguageName() ?? null }));
         `);
         expect(r.exitCode).toBe(0);
-        expect(JSON.parse(r.stdout)).toEqual({ value: null });
+        expect(JSON.parse(r.stdout)).toEqual({ value: '简体中文' });
       } finally {
         rmSync(configDir, { recursive: true, force: true });
       }
@@ -222,7 +222,7 @@ describe('preferences.uiLanguage', () => {
       }
     });
 
-    it('returns undefined for an unsupported persisted code', () => {
+    it('falls back to the default Chinese language for an unsupported persisted code', () => {
       const { configDir, prefsFile } = setupDir();
       try {
         writeRawPrefs(prefsFile, { uiLanguage: 'xx' });
@@ -231,7 +231,25 @@ describe('preferences.uiLanguage', () => {
           console.log(JSON.stringify({ value: resolveTitleLanguageName() ?? null }));
         `);
         expect(r.exitCode).toBe(0);
-        expect(JSON.parse(r.stdout)).toEqual({ value: null });
+        expect(JSON.parse(r.stdout)).toEqual({ value: '简体中文' });
+      } finally {
+        rmSync(configDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('formatPreferencesForPrompt', () => {
+    it('includes the default Chinese language even when no preferences are saved', () => {
+      const { configDir } = setupDir();
+      try {
+        const r = runScript(configDir, `
+          import { setupI18n } from '@craft-agent/shared/i18n';
+          import { formatPreferencesForPrompt } from '${PREFS_MODULE}';
+          setupI18n();
+          console.log(JSON.stringify({ prompt: formatPreferencesForPrompt() }));
+        `);
+        expect(r.exitCode).toBe(0);
+        expect(JSON.parse(r.stdout).prompt).toContain('Preferred language: 简体中文');
       } finally {
         rmSync(configDir, { recursive: true, force: true });
       }

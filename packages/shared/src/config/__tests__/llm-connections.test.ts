@@ -81,6 +81,14 @@ describe('getDefaultModelForConnection', () => {
     expect(modelIds).toContain(defaultModel)
   })
 
+  it('Pi openrouter default is DeepSeek V4 Flash and is in its own model list', () => {
+    const defaultModel = getDefaultModelForConnection('pi', 'openrouter')
+    const models = getDefaultModelsForConnection('pi', 'openrouter')
+    const modelIds = models.map(m => typeof m === 'string' ? m : m.id)
+    expect(defaultModel).toBe('pi/deepseek/deepseek-v4-flash')
+    expect(modelIds).toContain(defaultModel)
+  })
+
   it('returns empty string for pi_compat (dynamic provider)', () => {
     const defaultModel = getDefaultModelForConnection('pi_compat')
     expect(defaultModel).toBe('')

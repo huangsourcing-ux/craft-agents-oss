@@ -17,9 +17,11 @@ import {
   verifyPassword,
   createSessionToken,
   validateSession,
+  verifyJwt,
   buildSessionCookie,
   buildLogoutCookie,
 } from './auth'
+import type { JwtPayload, SessionUser } from './auth'
 import { generateCallbackPage } from '@craft-agent/shared/auth'
 import type { PlatformServices } from '../runtime/platform'
 
@@ -106,6 +108,38 @@ export function resolveWebSocketUrl(
   return `${wsProtocol}://127.0.0.1:${wsPort}`
 }
 
+function extractBearerToken(req: Request): string | null {
+  const authorization = req.headers.get('authorization')
+  if (!authorization) return null
+  const match = authorization.match(/^Bearer\s+(.+)$/i)
+  return match?.[1]?.trim() || null
+}
+
+async function validateSessionFromRequest(req: Request, secret: string): Promise<JwtPayload | null> {
+  const bearer = extractBearerToken(req)
+  if (bearer) return verifyJwt(bearer, secret)
+  return validateSession(req.headers.get('cookie'), secret)
+}
+
+async function getDefaultWorkspaceId(): Promise<string | null> {
+  const { getActiveWorkspace } = await import('@craft-agent/shared/config/storage')
+  return getActiveWorkspace()?.id ?? null
+}
+
+function buildAuthResponse(args: {
+  token: string
+  expiresAt: string
+  user: SessionUser
+  workspaceId: string | null
+}) {
+  return {
+    token: args.token,
+    user: args.user,
+    workspaceId: args.workspaceId ?? '',
+    expiresAt: args.expiresAt,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Handler options (shared between embedded and standalone modes)
 // ---------------------------------------------------------------------------
@@ -125,6 +159,8 @@ export interface WebuiHandlerOptions {
   secret: string
   /** Optional separate web UI password. Falls back to `secret` for verification. */
   password?: string
+  /** Username accepted by the built-in WebUI login form. */
+  username?: string
   /** Explicit Secure-cookie override. When unset, infer from the request / proxy headers. */
   secureCookies?: boolean
   /** Optional browser-facing WebSocket URL override for reverse-proxy deployments. */
@@ -171,6 +207,7 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
     webuiDir,
     secret,
     password,
+    username,
     secureCookies,
     publicWsUrl,
     wsProtocol,
@@ -184,6 +221,7 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
   const cleanupTimer = setInterval(() => rateLimiter.cleanup(), 120_000)
 
   const loginPassword = password || secret
+  const loginUsername = username || 'admin'
   const trustedProxySet = new Set(trustedProxies ?? [])
 
   // Hash the login password at startup (async, but resolves before first auth attempt in practice)
@@ -235,7 +273,7 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
     }
 
     // ── Auth endpoint ──
-    if (path === '/api/auth' && req.method === 'POST') {
+    if ((path === '/api/auth/login' || path === '/api/auth') && req.method === 'POST') {
       await passwordReady
       const ip = getClientIp(req)
 
@@ -247,11 +285,17 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
         )
       }
 
-      let body: { password?: string }
+      let body: { username?: string; password?: string }
       try {
-        body = await req.json() as { password?: string }
+        body = await req.json() as { username?: string; password?: string }
       } catch {
         return Response.json({ error: 'Invalid request body' }, { status: 400 })
+      }
+
+      const requestedUsername = body.username?.trim() || loginUsername
+      if (path === '/api/auth/login' && requestedUsername !== loginUsername) {
+        logger.warn(`[webui] Failed auth attempt for unknown username from ${ip}`)
+        return Response.json({ error: 'Invalid credentials' }, { status: 401 })
       }
 
       if (!body.password || typeof body.password !== 'string') {
@@ -263,13 +307,19 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
         return Response.json({ error: 'Invalid credentials' }, { status: 401 })
       }
 
-      const jwt = await createSessionToken(secret)
+      const workspaceId = await getDefaultWorkspaceId()
+      const user: SessionUser = {
+        id: `webui:${loginUsername}`,
+        username: loginUsername,
+        displayName: loginUsername,
+      }
+      const { token, expiresAt } = await createSessionToken(secret, { user, workspaceId })
       logger.info(`[webui] Successful auth from ${ip}`)
 
-      return Response.json({ ok: true }, {
+      return Response.json(buildAuthResponse({ token, expiresAt, user, workspaceId }), {
         status: 200,
         headers: {
-          'Set-Cookie': buildSessionCookie(jwt, useSecureCookies),
+          'Set-Cookie': buildSessionCookie(token, useSecureCookies),
         },
       })
     }
@@ -282,6 +332,27 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
           'Set-Cookie': buildLogoutCookie(useSecureCookies),
         },
       })
+    }
+
+    // ── Session endpoint (cookie or bearer auth) ──
+    if (path === '/api/auth/session' && req.method === 'GET') {
+      const session = await validateSessionFromRequest(req, secret)
+      if (!session) {
+        return Response.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      const workspaceId = session.workspace_id ?? await getDefaultWorkspaceId()
+      const user: SessionUser = {
+        id: session.sub,
+        username: session.username ?? loginUsername,
+        displayName: session.username ?? loginUsername,
+      }
+      const token = extractBearerToken(req) ?? ''
+      return Response.json(buildAuthResponse({
+        token,
+        expiresAt: new Date(session.exp * 1000).toISOString(),
+        user,
+        workspaceId,
+      }))
     }
 
     // ── OAuth callback (no cookie auth — state param is CSRF protection) ──

@@ -3,16 +3,22 @@ import * as storage from '@/lib/local-storage'
 import {
   resolveTheme,
   themeToCSS,
-  DEFAULT_THEME,
   DEFAULT_SHIKI_THEME,
   getShikiTheme,
   type ThemeOverrides,
   type ThemeFile,
   type ShikiThemeConfig,
 } from '@config/theme'
+import {
+  DEFAULT_FONT_FAMILY,
+  FORCED_DEFAULT_COLOR_THEME,
+  normalizeForcedThemePreference,
+  type FontFamilyPreference,
+  type StoredThemePreference,
+} from './theme-defaults'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
-export type FontFamily = 'inter' | 'system'
+export type FontFamily = FontFamilyPreference
 
 interface ThemeContextType {
   // Preferences (persisted at app level)
@@ -89,8 +95,6 @@ const BUNDLED_THEMES = new Map<string, ThemeFile>(
 
 interface ThemeProviderProps {
   children: ReactNode
-  defaultMode?: ThemeMode
-  defaultColorTheme?: string
   defaultFont?: FontFamily
   /** Active workspace ID for workspace-level theme overrides */
   activeWorkspaceId?: string | null
@@ -103,9 +107,9 @@ function getSystemPreference(): 'light' | 'dark' {
   return 'light'
 }
 
-function loadStoredTheme(): StoredTheme | null {
+function loadStoredTheme(): StoredThemePreference | null {
   if (typeof window === 'undefined') return null
-  return storage.get<StoredTheme | null>(storage.KEYS.theme, null)
+  return storage.get<StoredThemePreference | null>(storage.KEYS.theme, null)
 }
 
 function saveTheme(theme: StoredTheme): void {
@@ -114,23 +118,21 @@ function saveTheme(theme: StoredTheme): void {
 
 export function ThemeProvider({
   children,
-  defaultMode = 'system',
-  defaultColorTheme = 'default',
-  defaultFont = 'system',
+  defaultFont = DEFAULT_FONT_FAMILY,
   activeWorkspaceId = null
 }: ThemeProviderProps) {
-  const stored = loadStoredTheme()
+  const [initialTheme] = useState(() => {
+    const normalized = normalizeForcedThemePreference(loadStoredTheme(), defaultFont)
+    if (typeof window !== 'undefined') {
+      saveTheme(normalized)
+    }
+    return normalized
+  })
 
   // === Preference state (persisted at app level) ===
-  const [mode, setModeState] = useState<ThemeMode>(stored?.mode ?? defaultMode)
-  // Only use localStorage colorTheme if user explicitly set it via UI
-  const [colorTheme, setColorThemeState] = useState<string>(() => {
-    if (stored?.isUserOverride && stored.colorTheme) {
-      return stored.colorTheme
-    }
-    return defaultColorTheme // Will be updated by config.json effect
-  })
-  const [font, setFontState] = useState<FontFamily>(stored?.font ?? defaultFont)
+  const [mode, setModeState] = useState<ThemeMode>(initialTheme.mode)
+  const [colorTheme, setColorThemeState] = useState<string>(initialTheme.colorTheme)
+  const [font, setFontState] = useState<FontFamily>(initialTheme.font)
   const [systemPreference, setSystemPreference] = useState<'light' | 'dark'>(getSystemPreference)
   const [previewColorTheme, setPreviewColorTheme] = useState<string | null>(null)
 
@@ -140,19 +142,12 @@ export function ThemeProvider({
   // Track if we're receiving an external update to prevent echo broadcasts
   const isExternalUpdate = useRef(false)
 
-  // Load app-level colorTheme from config.json on mount (only if user hasn't overridden)
+  // Force the app-level color theme in config.json so app defaults and renderer
+  // localStorage stay aligned across restarts and windows.
   useEffect(() => {
-    // Skip if user has explicitly set a theme via UI
-    if (stored?.isUserOverride) return
-
-    window.electronAPI?.getColorTheme?.().then((configTheme) => {
-      if (configTheme && configTheme !== 'default') {
-        setColorThemeState(configTheme)
-      }
-    }).catch(() => {
-      // Keep default on error
+    window.electronAPI?.setColorTheme?.(FORCED_DEFAULT_COLOR_THEME).catch(() => {
+      // Keep the forced renderer default even if config persistence is unavailable.
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Only run on mount
 
   // === Preset theme state (singleton) ===
@@ -438,7 +433,7 @@ export function ThemeProvider({
     setModeState(newMode)
     // Preserve existing isUserOverride flag
     const existing = loadStoredTheme()
-    saveTheme({ mode: newMode, colorTheme, font, isUserOverride: existing?.isUserOverride })
+    saveTheme({ mode: newMode, colorTheme, font, isUserOverride: existing?.isUserOverride ?? true })
     if (!isExternalUpdate.current && window.electronAPI?.broadcastThemePreferences) {
       window.electronAPI.broadcastThemePreferences({ mode: newMode, colorTheme, font })
     }
@@ -448,6 +443,9 @@ export function ThemeProvider({
     setColorThemeState(newTheme)
     // Mark as user override - user explicitly changed theme via UI
     saveTheme({ mode, colorTheme: newTheme, font, isUserOverride: true })
+    window.electronAPI?.setColorTheme?.(newTheme).catch(() => {
+      // Renderer-local theme still updates even when config persistence fails.
+    })
     if (!isExternalUpdate.current && window.electronAPI?.broadcastThemePreferences) {
       window.electronAPI.broadcastThemePreferences({ mode, colorTheme: newTheme, font })
     }
@@ -457,7 +455,7 @@ export function ThemeProvider({
     setFontState(newFont)
     // Preserve existing isUserOverride flag
     const existing = loadStoredTheme()
-    saveTheme({ mode, colorTheme, font: newFont, isUserOverride: existing?.isUserOverride })
+    saveTheme({ mode, colorTheme, font: newFont, isUserOverride: existing?.isUserOverride ?? true })
     if (!isExternalUpdate.current && window.electronAPI?.broadcastThemePreferences) {
       window.electronAPI.broadcastThemePreferences({ mode, colorTheme, font: newFont })
     }

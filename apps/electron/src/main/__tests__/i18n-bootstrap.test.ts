@@ -1,15 +1,11 @@
 /**
  * Integration test for the main-process i18n bootstrap.
  *
- * Validates the building blocks of the regression fix:
- * - `getPersistedUiLanguage()` reads back what `setPersistedUiLanguage()` wrote.
- * - Calling `i18n.changeLanguage(persisted)` after `setupI18n()` makes
- *   `i18n.resolvedLanguage` match the persisted value.
+ * Validates the building blocks of the company default:
+ * - `setupI18n()` starts in the package default language.
+ * - The main-process bootstrap forces and persists that default language.
  *
- * Together these mean: if `preferences.json` has `uiLanguage: 'hu'` on disk,
- * main-process `i18n.resolvedLanguage` will be `'hu'` after the bootstrap
- * block in `apps/electron/src/main/index.ts` runs — which is the actual
- * thing that broke title generation across restarts.
+ * Together these mean existing and new users start in Simplified Chinese.
  *
  * `CONFIG_DIR` is captured at module-load, so each scenario runs in a
  * subprocess with `CRAFT_CONFIG_DIR` set in its env (same pattern as
@@ -40,48 +36,51 @@ function runScript(configDir: string, script: string): RunResult {
 }
 
 describe('main-process i18n bootstrap', () => {
-  it('hydrates main i18n from persisted uiLanguage', () => {
+  it('forces and persists the default UI language when none exists', () => {
     const configDir = mkdtempSync(join(tmpdir(), 'i18n-bootstrap-'))
     try {
       const r = runScript(
         configDir,
         `
-          import { setupI18n, i18n } from '@craft-agent/shared/i18n';
+          import { DEFAULT_UI_LANGUAGE, setupI18n, i18n } from '@craft-agent/shared/i18n';
           import { setPersistedUiLanguage, getPersistedUiLanguage } from '@craft-agent/shared/config';
           setupI18n();
-          setPersistedUiLanguage('hu');
+          await i18n.changeLanguage(DEFAULT_UI_LANGUAGE);
+          setPersistedUiLanguage(DEFAULT_UI_LANGUAGE);
           const persisted = getPersistedUiLanguage();
-          await i18n.changeLanguage(persisted);
           console.log(JSON.stringify({ persisted, resolved: i18n.resolvedLanguage }));
         `,
       )
       expect(r.exitCode).toBe(0)
-      expect(JSON.parse(r.stdout)).toEqual({ persisted: 'hu', resolved: 'hu' })
+      expect(JSON.parse(r.stdout)).toEqual({ persisted: 'zh-Hans', resolved: 'zh-Hans' })
       expect(existsSync(join(configDir, 'preferences.json'))).toBe(true)
     } finally {
       rmSync(configDir, { recursive: true, force: true })
     }
   })
 
-  it('returns undefined when no language is persisted (no hydration step)', () => {
+  it('overrides an existing persisted English language', () => {
     const configDir = mkdtempSync(join(tmpdir(), 'i18n-bootstrap-'))
     try {
+      writeFileSync(
+        join(configDir, 'preferences.json'),
+        JSON.stringify({ uiLanguage: 'en' }),
+        'utf-8',
+      )
       const r = runScript(
         configDir,
         `
-          import { setupI18n, i18n } from '@craft-agent/shared/i18n';
-          import { getPersistedUiLanguage } from '@craft-agent/shared/config';
+          import { DEFAULT_UI_LANGUAGE, setupI18n, i18n } from '@craft-agent/shared/i18n';
+          import { setPersistedUiLanguage, getPersistedUiLanguage } from '@craft-agent/shared/config';
           setupI18n();
+          await i18n.changeLanguage(DEFAULT_UI_LANGUAGE);
+          setPersistedUiLanguage(DEFAULT_UI_LANGUAGE);
           const persisted = getPersistedUiLanguage();
-          console.log(JSON.stringify({ persisted: persisted ?? null, resolved: i18n.resolvedLanguage }));
+          console.log(JSON.stringify({ persisted, resolved: i18n.resolvedLanguage }));
         `,
       )
       expect(r.exitCode).toBe(0)
-      const { persisted, resolved } = JSON.parse(r.stdout)
-      expect(persisted).toBeNull()
-      // Without LanguageDetector and without a hydration call, main-process i18n
-      // sits at fallbackLng — which is what made title generation default to English.
-      expect(resolved).toBe('en')
+      expect(JSON.parse(r.stdout)).toEqual({ persisted: 'zh-Hans', resolved: 'zh-Hans' })
     } finally {
       rmSync(configDir, { recursive: true, force: true })
     }

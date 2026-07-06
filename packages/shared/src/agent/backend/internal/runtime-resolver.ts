@@ -151,6 +151,12 @@ function resolveInterceptorBundlePath(hostRuntime: BackendHostRuntimeContext): s
     return hostRuntime.interceptorBundlePath;
   }
 
+  const cjsBundle = resolveUpwards(hostRuntime.appRootPath, join('dist', 'interceptor.cjs'))
+    ?? resolveUpwards(hostRuntime.appRootPath, join('apps', 'electron', 'dist', 'interceptor.cjs'));
+  const nodeRuntime = hostRuntime.nodeRuntimePath?.toLowerCase();
+  const usesNodeRuntime = !!nodeRuntime && !nodeRuntime.includes('bun');
+  if (usesNodeRuntime && cjsBundle) return cjsBundle;
+
   // In dev / monorepo runs, prefer the TypeScript source so changes are
   // picked up without a manual `bun run build:interceptor`. Bun handles
   // `--require <file>.ts` natively. Packaged builds always go through the
@@ -164,18 +170,27 @@ function resolveInterceptorBundlePath(hostRuntime: BackendHostRuntimeContext): s
     if (source) return source;
   }
 
-  return resolveUpwards(hostRuntime.appRootPath, join('dist', 'interceptor.cjs'))
-    ?? resolveUpwards(hostRuntime.appRootPath, join('apps', 'electron', 'dist', 'interceptor.cjs'));
+  return cjsBundle;
 }
 
 function resolveServerPath(hostRuntime: BackendHostRuntimeContext, serverName: string): string | undefined {
   if (hostRuntime.isPackaged) {
     return firstExistingPath([
+      join(hostRuntime.appRootPath, 'resources', serverName, 'index.mjs'),
+      join(hostRuntime.appRootPath, 'resources', serverName, 'index.cjs'),
       join(hostRuntime.appRootPath, 'resources', serverName, 'index.js'),
+      join(hostRuntime.appRootPath, 'dist', 'resources', serverName, 'index.mjs'),
+      join(hostRuntime.appRootPath, 'dist', 'resources', serverName, 'index.cjs'),
       join(hostRuntime.appRootPath, 'dist', 'resources', serverName, 'index.js'),
     ]);
   }
   return resolveUpwards(
+    hostRuntime.appRootPath,
+    join('packages', serverName, 'dist', 'index.mjs'),
+  ) ?? resolveUpwards(
+    hostRuntime.appRootPath,
+    join('packages', serverName, 'dist', 'index.cjs'),
+  ) ?? resolveUpwards(
     hostRuntime.appRootPath,
     join('packages', serverName, 'dist', 'index.js'),
   );

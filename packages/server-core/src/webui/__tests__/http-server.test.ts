@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { startWebuiHttpServer } from '../http-server'
 
 const SECRET = 'test-server-secret'
+const USERNAME = 'admin'
 const PASSWORD = 'test-password'
 const TEMP_DIRS: string[] = []
 const SERVERS: Array<{ stop: () => void }> = []
@@ -98,14 +99,54 @@ describe('startWebuiHttpServer', () => {
   it('rejects invalid credentials', async () => {
     const { baseUrl } = await createServer()
 
-    const res = await fetch(`${baseUrl}/api/auth`, {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: 'wrong-password' }),
+      body: JSON.stringify({ username: USERNAME, password: 'wrong-password' }),
     })
 
     expect(res.status).toBe(401)
     expect(await res.json()).toEqual({ error: 'Invalid credentials' })
+  })
+
+  it('accepts username/password login and returns a session contract', async () => {
+    const { baseUrl } = await createServer()
+
+    const authRes = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
+    })
+
+    expect(authRes.status).toBe(200)
+    expect(authRes.headers.get('set-cookie')).toContain('craft_session=')
+
+    const authJson = await authRes.json() as {
+      token?: string
+      user?: { id?: string; username?: string }
+      workspaceId?: string
+      expiresAt?: string
+    }
+    expect(typeof authJson.token).toBe('string')
+    expect(authJson.user?.username).toBe(USERNAME)
+    expect(typeof authJson.workspaceId).toBe('string')
+    expect(typeof authJson.expiresAt).toBe('string')
+
+    const sessionRes = await fetch(`${baseUrl}/api/auth/session`, {
+      headers: {
+        cookie: extractSessionCookie(authRes),
+      },
+    })
+
+    expect(sessionRes.status).toBe(200)
+    const sessionJson = await sessionRes.json() as {
+      user?: { username?: string }
+      workspaceId?: string
+      expiresAt?: string
+    }
+    expect(sessionJson.user?.username).toBe(USERNAME)
+    expect(typeof sessionJson.workspaceId).toBe('string')
+    expect(typeof sessionJson.expiresAt).toBe('string')
   })
 
   it('honors an explicit secure-cookie override', async () => {

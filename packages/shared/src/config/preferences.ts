@@ -3,7 +3,7 @@ import { join } from 'path';
 import { ensureConfigDir } from './storage.ts';
 import { CONFIG_DIR } from './paths.ts';
 import { readJsonFileSync } from '../utils/files.ts';
-import { i18n, SUPPORTED_LANGUAGE_CODES } from '../i18n/index.ts';
+import { DEFAULT_UI_LANGUAGE, i18n, SUPPORTED_LANGUAGE_CODES } from '../i18n/index.ts';
 import { LOCALE_REGISTRY, type LanguageCode } from '../i18n/registry.ts';
 
 export interface UserLocation {
@@ -115,18 +115,15 @@ export function setPersistedUiLanguage(code: LanguageCode): void {
 }
 
 /**
- * Native-language name to request for AI-generated session titles, or
- * `undefined` to let the model follow the conversation's own language.
+ * Native-language name to request for AI-generated session titles.
  *
  * Resolves from the explicitly persisted UI language (disk-backed) rather than
  * `i18n.resolvedLanguage`, which in the main process hydrates asynchronously at
  * startup and can still read the `'en'` fallback when an early title fires
- * (#885). Returning `undefined` when no language was chosen lets the title
- * prompt auto-detect the conversation language instead of being forced to
- * English.
+ * (#885). When no language has been persisted yet, use the package default.
  */
 export function resolveTitleLanguageName(): string | undefined {
-  const code = getPersistedUiLanguage();
+  const code = getPersistedUiLanguage() ?? DEFAULT_UI_LANGUAGE;
   return code ? LOCALE_REGISTRY[code]?.nativeName : undefined;
 }
 
@@ -137,12 +134,11 @@ export function formatPreferencesForPrompt(): string {
   const prefs = loadPreferences();
 
   // Derive language from the app's i18n setting (Appearance > Language).
-  const langCode = (i18n.resolvedLanguage ?? 'en') as LanguageCode;
+  const langCode = (i18n.resolvedLanguage ?? DEFAULT_UI_LANGUAGE) as LanguageCode;
   const langEntry = LOCALE_REGISTRY[langCode];
-  const langName = langEntry?.nativeName ?? 'English';
+  const langName = langEntry?.nativeName ?? LOCALE_REGISTRY[DEFAULT_UI_LANGUAGE].nativeName;
 
-  if (Object.keys(prefs).length === 0 ||
-      (!prefs.name && !prefs.timezone && !prefs.location && !prefs.notes && langCode === 'en')) {
+  if (!prefs.name && !prefs.timezone && !prefs.location && !prefs.notes && langCode === 'en') {
     return '';
   }
 
@@ -208,9 +204,9 @@ export function formatPreferencesDisplay(): string {
       lines.push('- Location: (not set)');
     }
 
-    const displayLangCode = (i18n.resolvedLanguage ?? 'en') as LanguageCode;
+    const displayLangCode = (i18n.resolvedLanguage ?? DEFAULT_UI_LANGUAGE) as LanguageCode;
     const displayLangEntry = LOCALE_REGISTRY[displayLangCode];
-    lines.push(`- Language: ${displayLangEntry?.nativeName ?? 'English'} (via Appearance settings)`);
+    lines.push(`- Language: ${displayLangEntry?.nativeName ?? LOCALE_REGISTRY[DEFAULT_UI_LANGUAGE].nativeName} (via Appearance settings)`);
 
     if (hasNotes) {
       lines.push('', '**Notes**', prefs.notes!);

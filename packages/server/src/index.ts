@@ -18,7 +18,8 @@
  *   CRAFT_VERSION              — app version (default: 0.0.0-dev)
  *   CRAFT_DEBUG                — 'true' for debug logging
  *   CRAFT_WEBUI_DIR            — path to built web UI assets (enables web UI on RPC port)
- *   CRAFT_WEBUI_PASSWORD       — optional shorter password for web login (falls back to CRAFT_SERVER_TOKEN)
+ *   CRAFT_WEBUI_USERNAME       — optional username for web login (default: admin)
+ *   CRAFT_WEBUI_PASSWORD       — optional password for web login (falls back to CRAFT_SERVER_TOKEN)
  *   CRAFT_WEBUI_SECURE_COOKIE  — optional true/false override for the session cookie Secure flag
  *   CRAFT_WEBUI_WS_URL         — optional browser-facing ws:// or wss:// URL returned by /api/config
  *   CRAFT_MESSAGING_WA_WORKER  — absolute path to worker.cjs (default: packages/messaging-whatsapp-worker/dist/worker.cjs)
@@ -28,6 +29,7 @@
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { readFileSync, existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { version as packageVersion } from '../package.json'
 import { enableDebug } from '@craft-agent/shared/utils/debug'
 import { bootstrapServer, startHealthHttpServer, generateServerToken } from '@craft-agent/server-core/bootstrap'
@@ -90,6 +92,10 @@ function parseOptionalWebSocketUrl(name: string, value: string | undefined): str
   }
 }
 
+function secretFingerprint(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 12)
+}
+
 // In dev (monorepo), bundled assets root is the repo root (4 levels up from this file).
 // In packaged mode, use CRAFT_BUNDLED_ASSETS_ROOT env or cwd.
 const bundledAssetsRoot = process.env.CRAFT_BUNDLED_ASSETS_ROOT
@@ -138,6 +144,7 @@ if (webuiEnabled && serverToken) {
   webuiHandler = createWebuiHandler({
     webuiDir: webuiDir!,
     secret: serverToken,
+    username: process.env.CRAFT_WEBUI_USERNAME || undefined,
     password: process.env.CRAFT_WEBUI_PASSWORD || undefined,
     secureCookies: webuiSecureCookies,
     publicWsUrl: webuiWsUrl,
@@ -307,7 +314,7 @@ const healthServer = await startHealthHttpServer({
 
 const serverProto = instance.protocol === 'wss' ? 'https' : 'http'
 console.log(`CRAFT_SERVER_URL=${instance.protocol}://${instance.host}:${instance.port}`)
-console.log(`CRAFT_SERVER_TOKEN=${instance.token}`)
+console.log(`CRAFT_SERVER_TOKEN=<configured sha256:${secretFingerprint(instance.token)}>`)
 if (webuiHandler) {
   console.log(`CRAFT_WEBUI_URL=${serverProto}://0.0.0.0:${instance.port}`)
 }

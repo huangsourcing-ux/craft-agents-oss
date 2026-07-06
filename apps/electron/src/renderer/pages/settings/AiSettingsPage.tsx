@@ -55,6 +55,7 @@ import { useAppShellContext } from '@/context/AppShellContext'
 import { getModelShortName, type ModelDefinition } from '@config/models'
 import { getModelsForProviderType, resolveMidStreamBehavior, type CustomEndpointApi, type MidStreamBehavior } from '@config/llm-connections'
 import { toast } from 'sonner'
+import { isManagedLlmMode } from '@/lib/managed-llm'
 
 /**
  * Compact token count: 1234 → "1.2K", 1234567 → "1.2M". Used by the RTK
@@ -626,6 +627,9 @@ function getApiKeyMethodForConnection(conn: LlmConnectionWithStatus): ApiSetupMe
 export default function AiSettingsPage() {
   const { t } = useTranslation()
   const { llmConnections, refreshLlmConnections, activeWorkspaceId } = useAppShellContext()
+  // [FORK] Company builds use a server-managed OpenRouter connection. Keep this
+  // page available for performance controls, but remove account/model setup UI.
+  const managedLlmMode = isManagedLlmMode()
 
   // API Setup overlay state
   const [showApiSetup, setShowApiSetup] = useState(false)
@@ -690,17 +694,21 @@ export default function AiSettingsPage() {
         const status = await window.electronAPI.getRtkStatus()
         setRtkStatus(status)
 
-        // Check credential health for potential issues (corruption, machine migration)
-        const health = await window.electronAPI.getCredentialHealth()
-        if (!health.healthy) {
-          setCredentialHealthIssues(health.issues)
+        if (managedLlmMode) {
+          setCredentialHealthIssues([])
+        } else {
+          // Check credential health for potential issues (corruption, machine migration)
+          const health = await window.electronAPI.getCredentialHealth()
+          if (!health.healthy) {
+            setCredentialHealthIssues(health.issues)
+          }
         }
       } catch (error) {
         console.error('Failed to load settings:', error)
       }
     }
     load()
-  }, [activeWorkspaceId])
+  }, [activeWorkspaceId, managedLlmMode])
 
   // Helpers to open/close the fullscreen API setup overlay
   const openApiSetup = useCallback((connectionSlug?: string) => {
@@ -1043,14 +1051,29 @@ export default function AiSettingsPage() {
         <ScrollArea className="h-full">
           <div className="px-5 py-7 max-w-3xl mx-auto">
             {/* Credential Health Warning Banner */}
-            <CredentialHealthBanner
-              issues={credentialHealthIssues}
-              onReauthenticate={handleReauthenticate}
-            />
+            {!managedLlmMode && (
+              <CredentialHealthBanner
+                issues={credentialHealthIssues}
+                onReauthenticate={handleReauthenticate}
+              />
+            )}
 
             <div className="space-y-8">
+              {managedLlmMode && (
+                <SettingsSection title="系统模型" description="AI 模型由后台统一管理，员工无需接入 API key 或模型账号。">
+                  <SettingsCard>
+                    <SettingsRow
+                      label="默认模型"
+                      description="OpenRouter · DeepSeek V4 Flash"
+                    >
+                      <span className="text-xs font-medium text-muted-foreground">已托管</span>
+                    </SettingsRow>
+                  </SettingsCard>
+                </SettingsSection>
+              )}
+
               {/* Default Settings - only show if connections exist */}
-              {llmConnections.length > 0 && (
+              {!managedLlmMode && llmConnections.length > 0 && (
               <SettingsSection title={t("settings.ai.defaultSection")} description={t("settings.ai.defaultSectionDesc")}>
                 <SettingsCard>
                   <SettingsMenuSelectRow
@@ -1092,7 +1115,7 @@ export default function AiSettingsPage() {
               )}
 
               {/* Workspace Overrides - only show if connections exist */}
-              {workspaces.length > 0 && llmConnections.length > 0 && (
+              {!managedLlmMode && workspaces.length > 0 && llmConnections.length > 0 && (
                 <SettingsSection title={t("settings.ai.workspaceOverrides")} description={t("settings.ai.workspaceOverridesDesc")}>
                   <div className="space-y-2">
                     {workspaces.map((workspace) => (
@@ -1108,6 +1131,7 @@ export default function AiSettingsPage() {
               )}
 
               {/* Connections Management */}
+              {!managedLlmMode && (
               <SettingsSection title={t("settings.ai.connections")} description={t("settings.ai.connectionsDesc")}>
                 <SettingsCard>
                   {llmConnections.length === 0 ? (
@@ -1149,6 +1173,7 @@ export default function AiSettingsPage() {
                   </button>
                 </div>
               </SettingsSection>
+              )}
 
               {/* Performance */}
               <SettingsSection title={t("settings.ai.performance")} description={t("settings.ai.performanceDesc")}>
@@ -1227,6 +1252,7 @@ export default function AiSettingsPage() {
               </SettingsSection>
 
               {/* API Setup Fullscreen Overlay */}
+              {!managedLlmMode && (
               <FullscreenOverlayBase
                 isOpen={showApiSetup}
                 onClose={handleCloseApiSetup}
@@ -1262,6 +1288,7 @@ export default function AiSettingsPage() {
                   </button>
                 </div>
               </FullscreenOverlayBase>
+              )}
 
               {/* Rename Connection Dialog */}
               <RenameDialog

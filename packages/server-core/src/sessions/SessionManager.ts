@@ -87,6 +87,7 @@ import { formatPathsToRelative, formatToolInputPaths, perf, encodeIconToDataUrlA
 import { loadAllSkills, loadSkillBySlug, invalidateSkillsCache, type LoadedSkill } from '@craft-agent/shared/skills'
 import { invalidateContextFileCache } from '@craft-agent/shared/prompts/system'
 import { getToolIconsDir, getMiniModel } from '@craft-agent/shared/config'
+import { ensureManagedSystemLlmConnection } from '@craft-agent/shared/config/managed-system-llm'
 import { getDefaultSummarizationModel } from '@craft-agent/shared/config/models'
 import type { SummarizeCallback } from '@craft-agent/shared/sources'
 import { type ThinkingLevel, DEFAULT_THINKING_LEVEL, normalizeThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
@@ -156,6 +157,7 @@ function buildBackendHostRuntimeContext(): BackendHostRuntimeContext {
     appRootPath: _platform.appRootPath,
     resourcesPath: _platform.resourcesPath,
     isPackaged: _platform.isPackaged,
+    nodeRuntimePath: process.env.CRAFT_BACKEND_NODE_BIN,
   }
 }
 
@@ -1807,6 +1809,10 @@ export class SessionManager implements ISessionManager {
       // Migrate legacy credentials to LLM connection format (one-time migration)
       // This ensures credentials saved before LLM connections are available via the new system
       await migrateLegacyCredentials()
+
+      // [FORK] In company-managed deployments, the headless server owns the
+      // OpenRouter connection and users never configure model credentials locally.
+      ensureManagedSystemLlmConnection()
 
       // Set up authentication environment variables (critical for SDK to work)
       await this.reinitializeAuth()

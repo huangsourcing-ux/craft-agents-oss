@@ -96,6 +96,7 @@ import {
   stripPiPrefixForDisplay,
 } from './model-picker-helpers'
 import { useModelVisionToggle } from './useModelVisionToggle'
+import { isManagedLlmMode } from '@/lib/managed-llm'
 
 function formatFollowUpChipText(text: string, fallback: string, maxLength = 50): string {
   const normalized = text.replace(/\s+/g, ' ').trim()
@@ -312,6 +313,9 @@ export function FreeFormInput({
   onRequestExpand,
 }: FreeFormInputProps) {
   const { t } = useTranslation()
+  // [FORK] Managed deployments fix the model on the server-side OpenRouter
+  // connection, so the renderer should not expose model or connection switching.
+  const showModelControls = !isManagedLlmMode()
 
   // Default rotating placeholders for onboarding/empty state (i18n-aware)
   const defaultPlaceholders = React.useMemo(() => [
@@ -1791,7 +1795,7 @@ export function FreeFormInput({
               onPermissionModeChange={onPermissionModeChange}
             />
           )}
-          {enableCompactModelPicker && (
+          {enableCompactModelPicker && showModelControls && (
             <CompactModelSelector
               currentModel={currentModel}
               currentConnection={currentConnection}
@@ -2028,7 +2032,7 @@ export function FreeFormInput({
           {/* Right side: Model + Send - never shrink so they're always visible */}
           <div className="flex items-center shrink-0">
           {/* 5. Model/Connection Selector - Hidden in compact mode (EditPopover embedding) */}
-          {!compactMode && (
+          {!compactMode && showModelControls && (
           <DropdownMenu open={modelDropdownOpen} onOpenChange={setModelDropdownOpen}>
             <Tooltip>
               <TooltipTrigger asChild>

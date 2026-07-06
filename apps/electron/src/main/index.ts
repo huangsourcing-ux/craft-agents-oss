@@ -60,20 +60,14 @@ Sentry.init({
 
 // Initialize i18n for main process (menus, dialogs, etc.)
 //
-// The main-process i18n instance has no detection plugin (no localStorage in Node)
-// — it always starts at `fallbackLng: 'en'`. We hydrate it here from the persisted
-// `uiLanguage` preference, which is maintained by the `i18n:changeLanguage` IPC
-// handler whenever the user changes Appearance → Language. Without this, the
-// renderer would restore its language from localStorage on every restart while
-// the main process silently stayed at English — breaking session title language,
-// the system prompt's "Preferred language" line, and the native menu.
-import { setupI18n, i18n, SUPPORTED_LANGUAGE_CODES, type LanguageCode } from '@craft-agent/shared/i18n'
-import { getPersistedUiLanguage, setPersistedUiLanguage } from '@craft-agent/shared/config'
+// The company build forces Simplified Chinese as the app UI language at startup.
+// Persisting it here keeps title generation, the system prompt, menus, and the
+// renderer's Appearance language in agreement even for existing users.
+import { DEFAULT_UI_LANGUAGE, setupI18n, i18n, SUPPORTED_LANGUAGE_CODES, type LanguageCode } from '@craft-agent/shared/i18n'
+import { setPersistedUiLanguage } from '@craft-agent/shared/config'
 setupI18n()
-const persistedUiLanguage = getPersistedUiLanguage()
-if (persistedUiLanguage) {
-  void i18n.changeLanguage(persistedUiLanguage)
-}
+void i18n.changeLanguage(DEFAULT_UI_LANGUAGE)
+setPersistedUiLanguage(DEFAULT_UI_LANGUAGE)
 // Note: deferred startup log lives below where mainLog is available (after log.initialize()).
 
 // Set anonymous machine ID for Sentry user tracking (no PII — just a hash).
@@ -126,7 +120,7 @@ log.initialize()
 // Diagnostic: report main-process i18n hydration result. We log here (not inline
 // at the hydration site above) because mainLog is only available after this point.
 mainLog.info('[i18n] startup hydration', {
-  persistedUiLanguage: persistedUiLanguage ?? null,
+  persistedUiLanguage: DEFAULT_UI_LANGUAGE,
   resolvedLanguageAfterHydration: i18n.resolvedLanguage ?? null,
 })
 
@@ -893,8 +887,8 @@ app.whenReady().then(async () => {
       })
 
       // Language change: sync from renderer to main process, persist, and rebuild native menu.
-      // Persistence here is what lets the next app launch hydrate main's i18n correctly —
-      // see the `getPersistedUiLanguage()` block at the top of this file.
+      // The renderer startup path sends the forced package default; manual
+      // Appearance changes still sync for the current runtime.
       ipcMain.handle('i18n:changeLanguage', async (_event, lang: unknown) => {
         const previousResolved = i18n.resolvedLanguage ?? null
         if (typeof lang !== 'string' || !SUPPORTED_LANGUAGE_CODES.includes(lang as LanguageCode)) {
@@ -1029,7 +1023,7 @@ app.whenReady().then(async () => {
       // Headless: print connection details
       if (isHeadless) {
         console.log(`CRAFT_SERVER_URL=${instance.protocol}://${instance.host}:${instance.port}`)
-        console.log(`CRAFT_SERVER_TOKEN=${instance.token}`)
+        console.log(`CRAFT_SERVER_TOKEN=<configured sha256:${createHash('sha256').update(instance.token).digest('hex').slice(0, 12)}>`)
       }
     }
 

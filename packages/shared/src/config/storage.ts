@@ -116,7 +116,7 @@ const FALLBACK_CONFIG_DEFAULTS: ConfigDefaults = {
   description: 'Default configuration values for Craft Agents',
   defaults: {
     notificationsEnabled: true,
-    colorTheme: 'default',
+    colorTheme: 'github',
     autoCapitalisation: true,
     sendMessageKey: 'enter',
     spellCheck: false,
