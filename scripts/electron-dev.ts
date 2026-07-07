@@ -29,7 +29,7 @@ const SESSION_SERVER_DIR = join(ROOT_DIR, "packages/session-mcp-server");
 const SESSION_SERVER_OUTPUT = join(SESSION_SERVER_DIR, "dist/index.js");
 // Pi agent server path (subprocess for Pi SDK sessions)
 const PI_AGENT_SERVER_DIR = join(ROOT_DIR, "packages/pi-agent-server");
-const PI_AGENT_SERVER_OUTPUT = join(PI_AGENT_SERVER_DIR, "dist/index.js");
+const PI_AGENT_SERVER_OUTPUT = join(PI_AGENT_SERVER_DIR, "dist/index.mjs");
 
 // Platform-specific binary paths (bun creates .exe on Windows, no extension on Unix)
 const IS_WINDOWS = process.platform === "win32";
@@ -336,7 +336,7 @@ async function runEsbuild(
 async function buildPiAgentServer(): Promise<{ success: boolean; error?: string }> {
   try {
     const proc = spawn({
-      cmd: ["bun", "build", "src/index.ts", "--outdir=dist", "--target=bun", "--format=esm"],
+      cmd: ["bun", "build", "src/index.ts", "--outfile", PI_AGENT_SERVER_OUTPUT, "--target=bun", "--format=esm", "--external", "koffi"],
       cwd: PI_AGENT_SERVER_DIR,
       stdout: "pipe",
       stderr: "pipe",

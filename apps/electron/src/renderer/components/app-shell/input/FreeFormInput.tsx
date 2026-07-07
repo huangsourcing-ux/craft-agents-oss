@@ -315,7 +315,9 @@ export function FreeFormInput({
   const { t } = useTranslation()
   // [FORK] Managed deployments fix the model on the server-side OpenRouter
   // connection, so the renderer should not expose model or connection switching.
-  const showModelControls = !isManagedLlmMode()
+  const managedLlmMode = isManagedLlmMode()
+  const showModelControls = true
+  const canToggleModelVision = !managedLlmMode
 
   // Default rotating placeholders for onboarding/empty state (i18n-aware)
   const defaultPlaceholders = React.useMemo(() => [
@@ -1638,7 +1640,9 @@ export function FreeFormInput({
         {showVisionWarning && effectiveConnectionDetails && (
           <ImageSupportWarningBanner
             modelName={currentModelDisplayName}
-            onEnable={() => handleToggleModelVision(effectiveConnectionDetails.slug, currentModel, true)}
+            onEnable={canToggleModelVision
+              ? () => handleToggleModelVision(effectiveConnectionDetails.slug, currentModel, true)
+              : undefined}
           />
         )}
 
@@ -2078,8 +2082,8 @@ export function FreeFormInput({
                 (() => {
                   // Single-model pi_compat connection on a non-empty session (or
                   // when there's only one connection, so no switcher to show).
-                  // Model row is disabled (locked to this session); vision toggle
-                  // remains interactive.
+                  // Model row is disabled (locked to this session); custom endpoints
+                  // may still allow a vision toggle unless this is company-managed.
                   const showVisionToggle =
                     !!effectiveConnectionDetails && isCompatProvider(effectiveConnectionDetails.providerType)
                   const visionOn = showVisionToggle && modelSupportsImages(effectiveConnectionDetails!, connectionDefaultModel)
@@ -2097,19 +2101,23 @@ export function FreeFormInput({
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span
-                                role="button"
-                                tabIndex={0}
+                                role={canToggleModelVision ? 'button' : 'img'}
+                                tabIndex={canToggleModelVision ? 0 : undefined}
                                 aria-label={visionOn
                                   ? t('chat.modelPicker.supportsImagesOn')
                                   : t('chat.modelPicker.supportsImagesOff')}
-                                className="inline-flex items-center justify-center p-1 rounded pointer-events-auto opacity-100 hover:bg-foreground/5 cursor-pointer"
+                                className={cn(
+                                  "inline-flex items-center justify-center p-1 rounded pointer-events-auto opacity-100",
+                                  canToggleModelVision ? "hover:bg-foreground/5 cursor-pointer" : "cursor-default"
+                                )}
                                 onClick={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
+                                  if (!canToggleModelVision) return
                                   handleToggleModelVision(effectiveConnectionDetails.slug, connectionDefaultModel, !visionOn)
                                 }}
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
+                                  if (canToggleModelVision && (e.key === 'Enter' || e.key === ' ')) {
                                     e.preventDefault()
                                     e.stopPropagation()
                                     handleToggleModelVision(effectiveConnectionDetails.slug, connectionDefaultModel, !visionOn)
@@ -2195,19 +2203,23 @@ export function FreeFormInput({
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             <span
-                                              role="button"
-                                              tabIndex={0}
+                                              role={canToggleModelVision ? 'button' : 'img'}
+                                              tabIndex={canToggleModelVision ? 0 : undefined}
                                               aria-label={visionOn
                                                 ? t('chat.modelPicker.supportsImagesOn')
                                                 : t('chat.modelPicker.supportsImagesOff')}
-                                              className="inline-flex items-center justify-center p-1 rounded hover:bg-foreground/5 cursor-pointer"
+                                              className={cn(
+                                                "inline-flex items-center justify-center p-1 rounded",
+                                                canToggleModelVision ? "hover:bg-foreground/5 cursor-pointer" : "cursor-default"
+                                              )}
                                               onClick={(e) => {
                                                 e.preventDefault()
                                                 e.stopPropagation()
+                                                if (!canToggleModelVision) return
                                                 handleToggleModelVision(conn.slug, modelId, !visionOn)
                                               }}
                                               onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                if (canToggleModelVision && (e.key === 'Enter' || e.key === ' ')) {
                                                   e.preventDefault()
                                                   e.stopPropagation()
                                                   handleToggleModelVision(conn.slug, modelId, !visionOn)
@@ -2285,19 +2297,23 @@ export function FreeFormInput({
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span
-                                  role="button"
-                                  tabIndex={0}
+                                  role={canToggleModelVision ? 'button' : 'img'}
+                                  tabIndex={canToggleModelVision ? 0 : undefined}
                                   aria-label={visionOn
                                     ? t('chat.modelPicker.supportsImagesOn')
                                     : t('chat.modelPicker.supportsImagesOff')}
-                                  className="inline-flex items-center justify-center p-1 rounded hover:bg-foreground/5 cursor-pointer"
+                                  className={cn(
+                                    "inline-flex items-center justify-center p-1 rounded",
+                                    canToggleModelVision ? "hover:bg-foreground/5 cursor-pointer" : "cursor-default"
+                                  )}
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
+                                    if (!canToggleModelVision) return
                                     handleToggleModelVision(effectiveConnectionDetails.slug, modelId, !visionOn)
                                   }}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
+                                    if (canToggleModelVision && (e.key === 'Enter' || e.key === ' ')) {
                                       e.preventDefault()
                                       e.stopPropagation()
                                       handleToggleModelVision(effectiveConnectionDetails.slug, modelId, !visionOn)

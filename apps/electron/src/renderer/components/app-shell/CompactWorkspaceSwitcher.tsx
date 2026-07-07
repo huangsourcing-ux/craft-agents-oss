@@ -30,6 +30,7 @@ interface CompactWorkspaceSwitcherProps {
   onWorkspaceCreated?: (workspace: Workspace) => void
   onWorkspaceRemoved?: () => void
   workspaceUnreadMap?: Record<string, boolean>
+  managedMode?: boolean
 }
 
 /**
@@ -46,6 +47,7 @@ export function CompactWorkspaceSwitcher({
   onWorkspaceCreated,
   onWorkspaceRemoved,
   workspaceUnreadMap,
+  managedMode = false,
 }: CompactWorkspaceSwitcherProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -113,6 +115,7 @@ export function CompactWorkspaceSwitcher({
   }, [workspaces, activeWorkspaceId, workspaceUnreadMap])
 
   const handleNewWorkspace = () => {
+    if (managedMode) return
     setShowCreationScreen(true)
     setFullscreenOverlayOpen(true)
     setOpen(false)
@@ -255,7 +258,7 @@ export function CompactWorkspaceSwitcher({
                       )}
                     </div>
                   </button>
-                  {!isActive && (
+                  {!managedMode && !isActive && (
                     <button
                       type="button"
                       onClick={() => handleRemoveWorkspace(workspace)}
@@ -265,7 +268,7 @@ export function CompactWorkspaceSwitcher({
                       <Trash2 className="h-4 w-4" />
                     </button>
                   )}
-                  {!isActive && !disconnected && (
+                  {!managedMode && !isActive && !disconnected && (
                     <button
                       type="button"
                       onClick={() => { onSelect(workspace.id, true); setOpen(false) }}
@@ -282,18 +285,20 @@ export function CompactWorkspaceSwitcher({
               )
             })}
 
-            <DrawerClose asChild>
-              <button
-                type="button"
-                onClick={handleNewWorkspace}
-                className="mt-1 flex items-center gap-3 px-3 py-3 rounded-[10px] hover:bg-foreground/5 transition-colors text-left"
-              >
-                <div className="h-7 w-7 rounded-full bg-foreground/5 flex items-center justify-center shrink-0">
-                  <FolderPlus className="h-4 w-4 text-foreground/60" />
-                </div>
-                <span className="text-sm font-medium">{t("workspace.addWorkspace")}</span>
-              </button>
-            </DrawerClose>
+            {!managedMode && (
+              <DrawerClose asChild>
+                <button
+                  type="button"
+                  onClick={handleNewWorkspace}
+                  className="mt-1 flex items-center gap-3 px-3 py-3 rounded-[10px] hover:bg-foreground/5 transition-colors text-left"
+                >
+                  <div className="h-7 w-7 rounded-full bg-foreground/5 flex items-center justify-center shrink-0">
+                    <FolderPlus className="h-4 w-4 text-foreground/60" />
+                  </div>
+                  <span className="text-sm font-medium">{t("workspace.addWorkspace")}</span>
+                </button>
+              </DrawerClose>
+            )}
           </div>
         </DrawerContent>
       </Drawer>

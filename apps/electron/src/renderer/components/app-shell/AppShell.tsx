@@ -23,6 +23,7 @@ import {
   Inbox,
   Globe,
   FolderOpen,
+  Images,
   Cake,
   Calendar,
   Layers,
@@ -113,6 +114,7 @@ import {
   isSettingsNavigation,
   isSkillsNavigation,
   isAutomationsNavigation,
+  isDesignNavigation,
   type NavigationState,
 } from "@/contexts/NavigationContext"
 import type { SettingsSubpage } from "../../../shared/types"
@@ -162,6 +164,8 @@ interface AppShellProps {
   menuNewChatTrigger?: number
   /** Focused mode - hides sidebars, shows only the chat content */
   isFocusedMode?: boolean
+  /** Company-managed mode exposes a single server-owned workspace. */
+  managedWorkspaceMode?: boolean
 }
 
 /** Filter mode for tri-state filtering: include shows only matching, exclude hides matching */
@@ -499,6 +503,7 @@ function AppShellContent({
   defaultCollapsed = false,
   menuNewChatTrigger,
   isFocusedMode = false,
+  managedWorkspaceMode = false,
 }: AppShellProps) {
   // Destructure commonly used values from context
   // Note: sessions is NOT destructured here - we use sessionMetaMapAtom instead
@@ -1694,6 +1699,11 @@ function AppShellContent({
     navigate(routes.view.sourcesLocal())
   }, [])
 
+  // Handler for the internal ecommerce design workbench
+  const handleDesignClick = useCallback(() => {
+    navigate(routes.view.design())
+  }, [])
+
   // Handler for skills view
   const handleSkillsClick = useCallback(() => {
     navigate(routes.view.skills())
@@ -1959,13 +1969,14 @@ function AppShellContent({
 
     // 3. Sources, Skills, Settings
     result.push({ id: 'nav:sources', type: 'nav', action: handleSourcesClick })
+    result.push({ id: 'nav:design', type: 'nav', action: handleDesignClick })
     result.push({ id: 'nav:skills', type: 'nav', action: handleSkillsClick })
     result.push({ id: 'nav:automations', type: 'nav', action: handleAutomationsClick })
     result.push({ id: 'nav:settings', type: 'nav', action: () => handleSettingsClick() })
     result.push({ id: 'nav:whats-new', type: 'nav', action: handleWhatsNewClick })
 
     return result
-  }, [handleAllSessionsClick, handleFlaggedClick, handleArchivedClick, handleSessionStatusClick, effectiveSessionStatuses, handleLabelClick, labelConfigs, labelTree, viewConfigs, handleViewClick, handleSourcesClick, handleSkillsClick, handleAutomationsClick, handleSettingsClick, handleWhatsNewClick])
+  }, [handleAllSessionsClick, handleFlaggedClick, handleArchivedClick, handleSessionStatusClick, effectiveSessionStatuses, handleLabelClick, labelConfigs, labelTree, viewConfigs, handleViewClick, handleSourcesClick, handleDesignClick, handleSkillsClick, handleAutomationsClick, handleSettingsClick, handleWhatsNewClick])
 
   // Toggle folder expanded state
   const handleToggleFolder = React.useCallback((path: string) => {
@@ -2095,6 +2106,8 @@ function AppShellContent({
       }
     }
 
+    if (isDesignNavigation(navState)) return "商品套图"
+
     // Settings navigator
     if (isSettingsNavigation(navState)) return t("sidebar.settings")
 
@@ -2173,6 +2186,10 @@ function AppShellContent({
     })
   }, [sessionFilter, labelCounts, activeWorkspace?.id, handleLabelClick, isExpanded, toggleExpanded, openConfigureLabels, handleAddLabel, handleDeleteLabel])
 
+  const effectiveNavigatorWidth = isDesignNavigation(navState)
+    ? 0
+    : sessionListWidth
+
   return (
     <AppShellProvider value={appShellContextValue}>
         {/* === TOP BAR === */}
@@ -2199,6 +2216,7 @@ function AppShellContent({
           onAddSessionPanel={() => handleNewChat(true)}
           onAddBrowserPanel={() => { void handleNewBrowserWindow() }}
           isCompact={isAutoCompact}
+          managedWorkspaceMode={managedWorkspaceMode}
         />
 
       {/* === OUTER LAYOUT: Unified Panel Stack | Right Sidebar === */}
@@ -2413,6 +2431,13 @@ function AppShellContent({
                       ],
                     },
                     {
+                      id: "nav:design",
+                      title: "商品套图",
+                      icon: Images,
+                      variant: isDesignNavigation(navState) ? "default" : "ghost",
+                      onClick: handleDesignClick,
+                    },
+                    {
                       id: "nav:skills",
                       title: t("sidebar.skills"),
                       label: String(skills.length),
@@ -2504,7 +2529,7 @@ function AppShellContent({
           sidebarWidth={effectiveSidebarAndNavigatorHidden ? 0 : (isSidebarVisible ? sidebarWidth : 0)}
           navigatorSlot={
             <div
-              style={{ width: isAutoCompact ? '100%' : sessionListWidth }}
+              style={{ width: isAutoCompact ? '100%' : effectiveNavigatorWidth }}
               className="h-full flex flex-col min-w-0 relative z-panel"
             >
             <PanelHeader
@@ -3262,7 +3287,7 @@ function AppShellContent({
             )}
             </div>
           }
-          navigatorWidth={isAutoCompact ? sessionListWidth : (effectiveSidebarAndNavigatorHidden ? 0 : sessionListWidth)}
+          navigatorWidth={isAutoCompact ? effectiveNavigatorWidth : (effectiveSidebarAndNavigatorHidden ? 0 : effectiveNavigatorWidth)}
           isSidebarAndNavigatorHidden={effectiveSidebarAndNavigatorHidden}
           isRightSidebarVisible={false}
           isCompact={isAutoCompact}

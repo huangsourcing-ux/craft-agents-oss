@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { modelSupportsImages, type LlmConnection } from '../llm-connections.ts'
+import { MANAGED_OPENROUTER_MODELS } from '../managed-openrouter-models.ts'
 
 const BASE_COMPAT: LlmConnection = {
   slug: 'custom',
@@ -12,6 +13,21 @@ const BASE_COMPAT: LlmConnection = {
 }
 
 describe('modelSupportsImages — pi_compat precedence', () => {
+  it('uses managed OpenRouter per-model image capabilities', () => {
+    const conn: LlmConnection = {
+      ...BASE_COMPAT,
+      customEndpoint: { api: 'openai-completions', supportsImages: false },
+      models: MANAGED_OPENROUTER_MODELS,
+    }
+
+    expect(modelSupportsImages(conn, 'z-ai/glm-5.2')).toBe(false)
+    expect(modelSupportsImages(conn, 'deepseek/deepseek-v4-pro')).toBe(false)
+    expect(modelSupportsImages(conn, 'xiaomi/mimo-v2.5')).toBe(true)
+    expect(modelSupportsImages(conn, 'minimax/minimax-m3')).toBe(true)
+    expect(modelSupportsImages(conn, 'moonshotai/kimi-k2.7-code')).toBe(true)
+    expect(modelSupportsImages(conn, 'qwen/qwen3.7-plus')).toBe(true)
+  })
+
   it('returns true when per-model supportsImages: true (override wins over connection default)', () => {
     const conn: LlmConnection = {
       ...BASE_COMPAT,

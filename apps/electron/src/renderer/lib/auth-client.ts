@@ -30,6 +30,8 @@ export class EmployeeAuthError extends Error {
 const SESSION_STORAGE_KEY = 'craft-employee-auth-session'
 const MOCK_USERNAME = 'demo'
 const MOCK_PASSWORD = 'demo123'
+const LOCAL_GATEWAY_BASE_URL = 'http://localhost:8080'
+const GATEWAY_API_PREFIXES = ['/api/auth', '/api/design', '/api/model-proxy', '/api/business-mcp']
 
 type ViteEnv = {
   DEV?: boolean
@@ -51,6 +53,19 @@ function getRuntimeEnvironment(): 'electron' | 'web' {
 
 function getGatewayBaseUrl(): string {
   return (getEnv().VITE_AUTH_GATEWAY_URL ?? '').replace(/\/+$/, '')
+}
+
+function getStoredGatewayBaseUrl(): string {
+  return (getStoredSession()?.serverUrl ?? '').replace(/\/+$/, '')
+}
+
+function isGatewayApiPath(path: string): boolean {
+  const pathname = path.split(/[?#]/, 1)[0] ?? path
+  return GATEWAY_API_PREFIXES.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
+function absoluteGatewayUrl(path: string, baseUrl: string): string {
+  return new URL(path, `${baseUrl.replace(/\/+$/, '')}/`).toString()
 }
 
 function isMockMode(): boolean {
@@ -98,9 +113,15 @@ function clearStoredSession(): void {
 }
 
 function buildUrl(path: string): string {
-  const baseUrl = getGatewayBaseUrl()
-  if (baseUrl) return `${baseUrl}${path}`
-  if (getRuntimeEnvironment() === 'web') return path
+  if (/^https?:\/\//i.test(path)) return path
+  const baseUrl = getGatewayBaseUrl() || getStoredGatewayBaseUrl()
+  if (baseUrl) return absoluteGatewayUrl(path, baseUrl)
+
+  const runtime = getRuntimeEnvironment()
+  if (runtime === 'electron' || (getEnv().DEV && isGatewayApiPath(path))) {
+    return absoluteGatewayUrl(path, LOCAL_GATEWAY_BASE_URL)
+  }
+  if (runtime === 'web') return path
   throw new EmployeeAuthError('Auth gateway URL is not configured.')
 }
 
@@ -157,6 +178,10 @@ async function requestSession(path: string, init?: RequestInit): Promise<Respons
 
 export const authClient = {
   isMockMode,
+
+  request(path: string, init?: RequestInit): Promise<Response> {
+    return requestSession(path, init)
+  },
 
   async getSession(): Promise<EmployeeAuthSession | null> {
     if (isMockMode()) return getStoredSession()

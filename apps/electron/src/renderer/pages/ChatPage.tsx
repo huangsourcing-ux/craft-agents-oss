@@ -28,6 +28,7 @@ import { ensureSessionMessagesLoadedAtom, forceSessionMessagesReloadAtom, loaded
 import { getSessionTitle } from '@/utils/session'
 // Model resolution: connection.defaultModel (no hardcoded defaults)
 import { resolveEffectiveConnectionSlug, isSessionConnectionUnavailable } from '@config/llm-connections'
+import { isManagedLlmMode, resolveManagedOpenRouterModelId } from '@/lib/managed-llm'
 
 export interface ChatPageProps {
   sessionId: string
@@ -305,6 +306,7 @@ const ChatPage = React.memo(function ChatPage({ sessionId }: ChatPageProps) {
 
   // Effective model for this session (session-specific or global fallback)
   const effectiveModel = React.useMemo(() => {
+    if (isManagedLlmMode()) return resolveManagedOpenRouterModelId(session?.model)
     if (session?.model) return session.model
 
     // When connection is unavailable, don't resolve through a different connection

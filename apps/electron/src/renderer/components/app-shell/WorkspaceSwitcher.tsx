@@ -33,6 +33,7 @@ interface WorkspaceSwitcherProps {
   onWorkspaceRemoved?: () => void
   /** workspaceId -> has unread */
   workspaceUnreadMap?: Record<string, boolean>
+  managedMode?: boolean
 }
 
 /**
@@ -51,6 +52,7 @@ export function WorkspaceSwitcher({
   onWorkspaceCreated,
   onWorkspaceRemoved,
   workspaceUnreadMap,
+  managedMode = false,
 }: WorkspaceSwitcherProps) {
   const { t } = useTranslation()
   const [showCreationScreen, setShowCreationScreen] = useState(false)
@@ -125,6 +127,7 @@ export function WorkspaceSwitcher({
   }, [workspaces, activeWorkspaceId, workspaceUnreadMap])
 
   const handleNewWorkspace = () => {
+    if (managedMode) return
     setShowCreationScreen(true)
     setFullscreenOverlayOpen(true)
   }
@@ -288,7 +291,7 @@ export function WorkspaceSwitcher({
                 </div>
                 <div className="flex items-center gap-1">
                   {/* Action buttons - only visible on hover for non-active workspaces */}
-                  {activeWorkspaceId !== workspace.id && (
+                  {!managedMode && activeWorkspaceId !== workspace.id && (
                     <button
                       data-touch-reveal="true"
                       className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/20 hover:text-destructive transition-opacity"
@@ -301,7 +304,7 @@ export function WorkspaceSwitcher({
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}
-                  {activeWorkspaceId !== workspace.id && !disconnected && (
+                  {!managedMode && activeWorkspaceId !== workspace.id && !disconnected && (
                     <button
                       data-touch-reveal="true"
                       className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-foreground/10 transition-opacity"
@@ -322,15 +325,18 @@ export function WorkspaceSwitcher({
             )
           })}
 
-          {/* Separator and New Workspace option */}
-          <StyledDropdownMenuSeparator />
-          <StyledDropdownMenuItem
-            onClick={handleNewWorkspace}
-            className="font-sans"
-          >
-            <FolderPlus className="h-4 w-4" />
-            {t("workspace.addWorkspace")}
-          </StyledDropdownMenuItem>
+          {!managedMode && (
+            <>
+              <StyledDropdownMenuSeparator />
+              <StyledDropdownMenuItem
+                onClick={handleNewWorkspace}
+                className="font-sans"
+              >
+                <FolderPlus className="h-4 w-4" />
+                {t("workspace.addWorkspace")}
+              </StyledDropdownMenuItem>
+            </>
+          )}
         </StyledDropdownMenuContent>
       </DropdownMenu>
     </>

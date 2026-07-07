@@ -43,6 +43,7 @@ import {
   stripPiPrefixForDisplay,
 } from './model-picker-helpers'
 import { useModelVisionToggle } from './useModelVisionToggle'
+import { isManagedLlmMode } from '@/lib/managed-llm'
 
 interface CompactModelSelectorProps {
   currentModel: string
@@ -78,6 +79,7 @@ export function CompactModelSelector({
   const appShellCtx = useOptionalAppShellContext()
   const llmConnections = appShellCtx?.llmConnections ?? []
   const workspaceDefaultConnection = appShellCtx?.workspaceDefaultLlmConnection
+  const managedLlmMode = isManagedLlmMode()
 
   const toggleVision = useModelVisionToggle()
 
@@ -232,6 +234,7 @@ export function CompactModelSelector({
               modelId={connectionDefaultModel}
               connection={effectiveConnectionDetails}
               onToggleVision={toggleVision}
+              readOnly={managedLlmMode}
             />
           ) : pickerMode === 'switcher' ? (
             connectionsByProvider.map(([providerName, connections]) => (
@@ -307,6 +310,7 @@ export function CompactModelSelector({
                                     {showVision && (
                                       <VisionToggle
                                         visionOn={visionOn}
+                                        readOnly={managedLlmMode}
                                         onToggle={(e) => {
                                           e.preventDefault()
                                           e.stopPropagation()
@@ -373,6 +377,7 @@ export function CompactModelSelector({
                       {showVision && effectiveConnectionDetails && (
                         <VisionToggle
                           visionOn={visionOn}
+                          readOnly={managedLlmMode}
                           onToggle={(e) => {
                             e.preventDefault()
                             e.stopPropagation()
@@ -458,10 +463,12 @@ function LockedSingleRow({
   modelId,
   connection,
   onToggleVision,
+  readOnly = false,
 }: {
   modelId: string
   connection: LlmConnectionWithStatus | null
   onToggleVision: (connectionSlug: string, modelId: string, enabled: boolean) => Promise<void>
+  readOnly?: boolean
 }) {
   const { t } = useTranslation()
   const showVision = !!connection && isCompatProvider(connection.providerType)
@@ -476,6 +483,7 @@ function LockedSingleRow({
         {showVision && connection && (
           <VisionToggle
             visionOn={visionOn}
+            readOnly={readOnly}
             onToggle={(e) => {
               e.preventDefault()
               e.stopPropagation()
@@ -492,22 +500,27 @@ function LockedSingleRow({
 function VisionToggle({
   visionOn,
   onToggle,
+  readOnly = false,
 }: {
   visionOn: boolean
   onToggle: (e: React.MouseEvent | React.KeyboardEvent) => void
+  readOnly?: boolean
 }) {
   const { t } = useTranslation()
   return (
     <span
-      role="button"
-      tabIndex={0}
+      role={readOnly ? 'img' : 'button'}
+      tabIndex={readOnly ? undefined : 0}
       aria-label={visionOn
         ? t('chat.modelPicker.supportsImagesOn')
         : t('chat.modelPicker.supportsImagesOff')}
-      className="inline-flex items-center justify-center p-2 rounded hover:bg-foreground/5 cursor-pointer"
-      onClick={onToggle}
+      className={cn(
+        "inline-flex items-center justify-center p-2 rounded",
+        readOnly ? "cursor-default" : "hover:bg-foreground/5 cursor-pointer",
+      )}
+      onClick={readOnly ? undefined : onToggle}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onToggle(e)
+        if (!readOnly && (e.key === 'Enter' || e.key === ' ')) onToggle(e)
       }}
     >
       <ImageIcon

@@ -3,8 +3,10 @@ import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
 import { loadWorkspaceSources } from '@craft-agent/shared/sources'
 import { safeJsonParse } from '@craft-agent/shared/utils/files'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
-import type { RpcServer } from '@craft-agent/server-core/transport'
+import { pushTyped, type RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
+
+const MANAGED_BACKEND_SOURCE_SLUG = 'wudi-backend'
 
 export const HANDLED_CHANNELS = [
   RPC_CHANNELS.sources.GET,
@@ -12,11 +14,16 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.sources.DELETE,
   RPC_CHANNELS.sources.START_OAUTH,
   RPC_CHANNELS.sources.SAVE_CREDENTIALS,
+  RPC_CHANNELS.settings.SYNC_MANAGED_BACKEND_SOURCE,
   RPC_CHANNELS.sources.GET_PERMISSIONS,
   RPC_CHANNELS.workspace.GET_PERMISSIONS,
   RPC_CHANNELS.permissions.GET_DEFAULTS,
   RPC_CHANNELS.sources.GET_MCP_TOOLS,
 ] as const
+
+function managedBackendMcpUrl(serverUrl: string): string {
+  return new URL('/api/business-mcp', serverUrl).toString().replace(/\/+$/, '')
+}
 
 export function registerSourcesHandlers(server: RpcServer, deps: HandlerDeps): void {
   const log = deps.platform.logger
@@ -88,6 +95,94 @@ export function registerSourcesHandlers(server: RpcServer, deps: HandlerDeps): v
     await credManager.save(source, { value: credential })
 
     log.info(`Saved credentials for source: ${sourceSlug}`)
+  })
+
+  // [FORK] Sync the company-managed backend MCP source into a local workspace.
+  // This preserves local workspace semantics while making server-side business
+  // tools available through the normal Sources/MCP pipeline.
+  server.handle(RPC_CHANNELS.settings.SYNC_MANAGED_BACKEND_SOURCE, async (_ctx, workspaceId: string, setup: { serverUrl: string; token: string }) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) return { success: false, error: `Workspace not found: ${workspaceId}` }
+
+    try {
+      const {
+        loadSource,
+        saveSourceConfig,
+        saveSourceGuide,
+        getSourceCredentialManager,
+      } = await import('@craft-agent/shared/sources')
+      const { loadWorkspaceConfig, saveWorkspaceConfig } = await import('@craft-agent/shared/workspaces')
+      const { saveSourcePermissions } = await import('@craft-agent/shared/agent')
+
+      const existing = loadSource(workspace.rootPath, MANAGED_BACKEND_SOURCE_SLUG)
+      const now = Date.now()
+      const enabled = existing?.config.enabled ?? true
+      const sourceConfig = {
+        id: existing?.config.id ?? `${MANAGED_BACKEND_SOURCE_SLUG}_system`,
+        name: 'Wudi Backend Services',
+        slug: MANAGED_BACKEND_SOURCE_SLUG,
+        enabled,
+        provider: 'wudi',
+        type: 'mcp' as const,
+        mcp: {
+          transport: 'http' as const,
+          url: managedBackendMcpUrl(setup.serverUrl),
+          authType: 'bearer' as const,
+        },
+        icon: existing?.config.icon ?? 'W',
+        tagline: 'Company-managed backend MCP services.',
+        isAuthenticated: true,
+        connectionStatus: 'connected' as const,
+        createdAt: existing?.config.createdAt ?? now,
+        updatedAt: now,
+      }
+
+      saveSourceConfig(workspace.rootPath, sourceConfig)
+      saveSourceGuide(workspace.rootPath, MANAGED_BACKEND_SOURCE_SLUG, {
+        raw: `# Wudi Backend Services
+
+Company-managed MCP tools exposed by the Wudi backend. These tools use your employee login session and do not store backend service secrets in the client.
+
+## Scope
+
+Use this source for company-provided backend services and employee-context tools.
+
+## Guidelines
+
+- Do not use this source for local filesystem access.
+- Prefer user-configured local MCP or API sources for personal integrations.
+`,
+      })
+      saveSourcePermissions(workspace.rootPath, MANAGED_BACKEND_SOURCE_SLUG, {
+        version: '2026-07-07',
+        allowedMcpPatterns: ['wudi_'],
+      })
+
+      const source = loadSource(workspace.rootPath, MANAGED_BACKEND_SOURCE_SLUG)
+      if (!source) return { success: false, error: 'Failed to load synced backend source.' }
+
+      await getSourceCredentialManager().save(source, { value: setup.token })
+
+      if (!existing && enabled) {
+        const workspaceConfig = loadWorkspaceConfig(workspace.rootPath)
+        if (workspaceConfig) {
+          workspaceConfig.defaults = workspaceConfig.defaults ?? {}
+          const enabledSlugs = workspaceConfig.defaults.enabledSourceSlugs ?? []
+          if (!enabledSlugs.includes(MANAGED_BACKEND_SOURCE_SLUG)) {
+            workspaceConfig.defaults.enabledSourceSlugs = [...enabledSlugs, MANAGED_BACKEND_SOURCE_SLUG]
+            saveWorkspaceConfig(workspace.rootPath, workspaceConfig)
+          }
+        }
+      }
+
+      const sources = loadWorkspaceSources(workspace.rootPath)
+      pushTyped(server, RPC_CHANNELS.sources.CHANGED, { to: 'workspace', workspaceId }, workspaceId, sources)
+      return { success: true, sourceSlug: MANAGED_BACKEND_SOURCE_SLUG }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      log.error('Failed to sync managed backend source:', message)
+      return { success: false, error: message }
+    }
   })
 
   // Get permissions config for a source (raw format for UI display)

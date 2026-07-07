@@ -109,11 +109,18 @@ describe('managed system LLM bootstrap', () => {
       providerType: 'pi',
       authType: 'environment',
       piAuthProvider: 'openrouter',
-      defaultModel: 'pi/deepseek/deepseek-v4-flash',
+      defaultModel: 'pi/minimax/minimax-m3',
       modelSelectionMode: 'userDefined3Tier',
       midStreamBehavior: 'steer',
     })
-    expect(connection.models.map((model: any) => model.id)).toContain('pi/deepseek/deepseek-v4-flash')
+    expect(connection.models.map((model: any) => model.id)).toEqual([
+      'pi/z-ai/glm-5.2',
+      'pi/xiaomi/mimo-v2.5',
+      'pi/minimax/minimax-m3',
+      'pi/moonshotai/kimi-k2.7-code',
+      'pi/qwen/qwen3.7-plus',
+      'pi/deepseek/deepseek-v4-pro',
+    ])
 
     const workspaceConfig = readJson(workspaceConfigPath)
     expect(workspaceConfig.defaults.defaultLlmConnection).toBeUndefined()
@@ -148,7 +155,7 @@ describe('managed system LLM bootstrap', () => {
     expect(connection.authType).toBe('environment')
     expect(connection.piAuthProvider).toBe('openrouter')
     expect(connection.baseUrl).toBeUndefined()
-    expect(connection.defaultModel).toBe('pi/deepseek/deepseek-v4-flash')
+    expect(connection.defaultModel).toBe('pi/minimax/minimax-m3')
     expect(config.defaultLlmConnection).toBe('system-openrouter')
   })
 

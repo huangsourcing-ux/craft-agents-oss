@@ -25,6 +25,7 @@
     "./docs/doc-links": "./src/docs/doc-links.ts",
     "./config/types": "./src/config/types.ts",
     "./config/managed-system-llm": "./src/config/managed-system-llm.ts",
+    "./config/managed-openrouter-models": "./src/config/managed-openrouter-models.ts",
     "./credentials": "./src/credentials/index.ts",
     "./mcp": "./src/mcp/index.ts",
     "./prompts": "./src/prompts/index.ts",

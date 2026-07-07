@@ -414,6 +414,8 @@ export interface ElectronAPI {
   setupLlmConnection(setup: LlmConnectionSetup): Promise<{ success: boolean; error?: string }>
   /** Unified connection test — spawns a lightweight agent subprocess to validate credentials */
   testLlmConnectionSetup(params: TestLlmConnectionParams): Promise<TestLlmConnectionResult>
+  /** [FORK] Sync the company-managed backend MCP source into a local workspace */
+  syncManagedBackendSource(workspaceId: string, setup: { serverUrl: string; token: string }): Promise<{ success: boolean; sourceSlug?: string; error?: string }>
   // Pi provider discovery (main process only — Pi SDK can't run in renderer)
   getPiApiKeyProviders(): Promise<Array<{ key: string; label: string; placeholder: string }>>
   getPiProviderBaseUrl(provider: string): Promise<string | undefined>
@@ -852,6 +854,14 @@ export interface AutomationsNavigationState {
 }
 
 /**
+ * Internal ecommerce design workbench navigation state
+ */
+export interface DesignNavigationState {
+  navigator: 'design'
+  rightSidebar?: RightSidebarPanel
+}
+
+/**
  * Unified navigation state
  */
 export type NavigationState =
@@ -860,6 +870,7 @@ export type NavigationState =
   | SettingsNavigationState
   | SkillsNavigationState
   | AutomationsNavigationState
+  | DesignNavigationState
 
 export const isSessionsNavigation = (
   state: NavigationState
@@ -881,6 +892,10 @@ export const isAutomationsNavigation = (
   state: NavigationState
 ): state is AutomationsNavigationState => state.navigator === 'automations'
 
+export const isDesignNavigation = (
+  state: NavigationState
+): state is DesignNavigationState => state.navigator === 'design'
+
 export const DEFAULT_NAVIGATION_STATE: NavigationState = {
   navigator: 'sessions',
   filter: { kind: 'allSessions' },
@@ -888,6 +903,9 @@ export const DEFAULT_NAVIGATION_STATE: NavigationState = {
 }
 
 export const getNavigationStateKey = (state: NavigationState): string => {
+  if (state.navigator === 'design') {
+    return 'design'
+  }
   if (state.navigator === 'sources') {
     if (state.details) {
       return `sources/source/${state.details.sourceSlug}`
@@ -924,6 +942,9 @@ export const getNavigationStateKey = (state: NavigationState): string => {
 }
 
 export const parseNavigationStateKey = (key: string): NavigationState | null => {
+  // Handle design workbench
+  if (key === 'design') return { navigator: 'design' }
+
   // Handle sources
   if (key === 'sources') return { navigator: 'sources', details: null }
   if (key.startsWith('sources/source/')) {

@@ -59,6 +59,8 @@ interface TopBarProps {
   onAddBrowserPanel: () => void
   /** When true, hides controls that don't apply in compact/mobile layout */
   isCompact?: boolean
+  /** When true, workspace management is owned by employee auth. */
+  managedWorkspaceMode?: boolean
 }
 
 export function TopBar({
@@ -84,6 +86,7 @@ export function TopBar({
   onAddSessionPanel,
   onAddBrowserPanel,
   isCompact,
+  managedWorkspaceMode = false,
 }: TopBarProps) {
   const { t } = useTranslation()
   const [maxVisibleBrowserBadges, setMaxVisibleBrowserBadges] = useState(3)
@@ -205,6 +208,7 @@ export function TopBar({
                 onWorkspaceCreated={onWorkspaceCreated}
                 onWorkspaceRemoved={onWorkspaceRemoved}
                 workspaceUnreadMap={workspaceUnreadMap}
+                managedMode={managedWorkspaceMode}
               />
             ) : (
               <WorkspaceSwitcher
@@ -215,6 +219,7 @@ export function TopBar({
                 onWorkspaceCreated={onWorkspaceCreated}
                 onWorkspaceRemoved={onWorkspaceRemoved}
                 workspaceUnreadMap={workspaceUnreadMap}
+                managedMode={managedWorkspaceMode}
               />
             )}
           </div>

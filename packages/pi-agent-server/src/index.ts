@@ -14,6 +14,7 @@
  * separate process, avoiding bundling issues in the Electron main process.
  */
 
+import './bun-worker-threads-shim.ts';
 import http from 'node:http';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';

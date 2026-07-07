@@ -246,6 +246,7 @@ const EXPECTED_CHANNELS: string[] = [
   'settings:setNetworkProxy',
   'settings:setServerConfig',
   'settings:setupLlmConnection',
+  'settings:syncManagedBackendSource',
   'settings:testLlmConnectionSetup',
   'shell:openFile',
   'shell:openUrl',

@@ -35,7 +35,7 @@ export interface ParsedRoute {
 // Compound Route Types (new format)
 // =============================================================================
 
-export type NavigatorType = 'sessions' | 'sources' | 'skills' | 'automations' | 'settings'
+export type NavigatorType = 'sessions' | 'sources' | 'skills' | 'automations' | 'design' | 'settings'
 
 export interface ParsedCompoundRoute {
   /** The navigator type */
@@ -61,7 +61,7 @@ export interface ParsedCompoundRoute {
  * Known prefixes that indicate a compound route
  */
 const COMPOUND_ROUTE_PREFIXES = [
-  'allSessions', 'flagged', 'archived', 'state', 'label', 'view', 'sources', 'skills', 'automations', 'settings'
+  'allSessions', 'flagged', 'archived', 'state', 'label', 'view', 'sources', 'skills', 'automations', 'design', 'settings'
 ]
 
 /**
@@ -93,6 +93,11 @@ export function parseCompoundRoute(route: string): ParsedCompoundRoute | null {
   if (segments.length === 0) return null
 
   const first = segments[0]
+
+  // Design workbench
+  if (first === 'design') {
+    return segments.length === 1 ? { navigator: 'design', details: null } : null
+  }
 
   // Settings navigator
   if (first === 'settings') {
@@ -259,6 +264,10 @@ export function parseCompoundRoute(route: string): ParsedCompoundRoute | null {
  * Build a compound route string from parsed state
  */
 export function buildCompoundRoute(parsed: ParsedCompoundRoute): string {
+  if (parsed.navigator === 'design') {
+    return 'design'
+  }
+
   if (parsed.navigator === 'settings') {
     if (!parsed.details) return 'settings'
     return `settings/${parsed.details.type}`
@@ -379,6 +388,10 @@ export function parseRoute(route: string): ParsedRoute | null {
  * Convert a parsed compound route to ParsedRoute format (type: 'view')
  */
 function convertCompoundToViewRoute(compound: ParsedCompoundRoute): ParsedRoute {
+  if (compound.navigator === 'design') {
+    return { type: 'view', name: 'design', params: {} }
+  }
+
   // Settings
   if (compound.navigator === 'settings') {
     const subpage = compound.details?.type || 'app'
@@ -496,6 +509,10 @@ export function parseRouteToNavigationState(
  * Convert a ParsedCompoundRoute to NavigationState
  */
 function convertCompoundToNavigationState(compound: ParsedCompoundRoute): NavigationState {
+  if (compound.navigator === 'design') {
+    return { navigator: 'design' }
+  }
+
   // Settings
   if (compound.navigator === 'settings') {
     if (!compound.details) {
@@ -624,6 +641,8 @@ function convertParsedRouteToNavigationState(parsed: ParsedRoute): NavigationSta
         }
       }
       return { navigator: 'automations', details: null }
+    case 'design':
+      return { navigator: 'design' }
     case 'session':
       if (parsed.id) {
         // Reconstruct filter from params
@@ -699,6 +718,10 @@ function convertParsedRouteToNavigationState(parsed: ParsedRoute): NavigationSta
  * Convert NavigationState to ParsedCompoundRoute
  */
 function navigationStateToCompoundRoute(state: NavigationState): ParsedCompoundRoute {
+  if (state.navigator === 'design') {
+    return { navigator: 'design', details: null }
+  }
+
   if (state.navigator === 'settings') {
     if (state.subpage === null) {
       return { navigator: 'settings', details: null }

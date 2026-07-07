@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
 
+const authGatewayTarget = process.env.VITE_AUTH_GATEWAY_URL || 'http://localhost:8080'
+
 // NOTE: Source map upload to Sentry is intentionally disabled.
 // To re-enable, uncomment the sentryVitePlugin below and add SENTRY_AUTH_TOKEN,
 // SENTRY_ORG, SENTRY_PROJECT to CI secrets. See CLAUDE.md "Sentry Error Tracking" section.
@@ -69,6 +71,12 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    open: false
+    open: false,
+    proxy: {
+      '/api/auth': authGatewayTarget,
+      '/api/design': authGatewayTarget,
+      '/api/model-proxy': authGatewayTarget,
+      '/api/business-mcp': authGatewayTarget,
+    },
   }
 })

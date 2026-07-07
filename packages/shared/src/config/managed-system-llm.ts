@@ -1,7 +1,10 @@
 import type { Workspace } from '@craft-agent/core/types';
 import type { LlmConnection } from './llm-connections.ts';
 import { defaultMidStreamBehavior } from './llm-connections.ts';
-import type { ModelDefinition } from './models.ts';
+import {
+  getManagedOpenRouterModels,
+  toManagedOpenRouterPiModelId,
+} from './managed-openrouter-models.ts';
 import { loadStoredConfig, saveConfig, type StoredConfig } from './storage.ts';
 import { loadWorkspaceConfig, saveWorkspaceConfig } from '../workspaces/storage.ts';
 import type { WorkspaceConfig } from '../workspaces/types.ts';
@@ -9,7 +12,7 @@ import type { WorkspaceConfig } from '../workspaces/types.ts';
 export const WUDI_MANAGED_LLM_ENV = 'WUDI_MANAGED_LLM';
 export const OPENROUTER_API_KEY_ENV = 'OPENROUTER_API_KEY';
 export const SYSTEM_OPENROUTER_CONNECTION_SLUG = 'system-openrouter';
-export const SYSTEM_OPENROUTER_MODEL_ID = 'pi/deepseek/deepseek-v4-flash';
+export const SYSTEM_OPENROUTER_MODEL_ID = toManagedOpenRouterPiModelId(undefined);
 
 export interface ManagedSystemLlmBootstrapResult {
   enabled: boolean;
@@ -17,16 +20,6 @@ export interface ManagedSystemLlmBootstrapResult {
   workspaceOverridesCleared: number;
   connectionSlug?: string;
 }
-
-const SYSTEM_OPENROUTER_MODEL: ModelDefinition = {
-  id: SYSTEM_OPENROUTER_MODEL_ID,
-  name: 'DeepSeek: DeepSeek V4 Flash',
-  shortName: 'DeepSeek V4 Flash',
-  description: 'System-managed DeepSeek V4 Flash via OpenRouter.',
-  provider: 'pi',
-  contextWindow: 1_048_576,
-  supportsThinking: true,
-};
 
 function envFlagEnabled(value: string | undefined): boolean {
   if (!value) return false;
@@ -52,7 +45,7 @@ export function buildSystemOpenRouterConnection(existing?: LlmConnection, now = 
     authType: 'environment',
     piAuthProvider: 'openrouter',
     defaultModel: SYSTEM_OPENROUTER_MODEL_ID,
-    models: [{ ...SYSTEM_OPENROUTER_MODEL }],
+    models: getManagedOpenRouterModels({ piPrefix: true }),
     modelSelectionMode: 'userDefined3Tier',
     midStreamBehavior: defaultMidStreamBehavior('pi'),
     createdAt: existing?.createdAt ?? now,

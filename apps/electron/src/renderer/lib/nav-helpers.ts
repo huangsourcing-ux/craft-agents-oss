@@ -19,6 +19,7 @@ import type { NavigationState } from '../../shared/types'
  * - sessions: a session is selected
  * - settings: a subpage is selected (bare `settings` route → false)
  * - sources / skills / automations: a detail item is selected
+ * - design: the workbench is already the content surface
  */
 export function isDetailNavState(navState: NavigationState | null): boolean {
   if (!navState) return false
@@ -31,5 +32,7 @@ export function isDetailNavState(navState: NavigationState | null): boolean {
     case 'skills':
     case 'automations':
       return navState.details !== null
+    case 'design':
+      return true
   }
 }

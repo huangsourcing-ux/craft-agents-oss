@@ -165,6 +165,13 @@ export const BUILT_IN_CONNECTION_TEMPLATES: Record<string, {
     authType: 'api_key',
     // piAuthProvider set dynamically from setup.piAuthProvider
   },
+  // [FORK] System-managed model proxy for employee login builds. The real
+  // upstream key stays on auth-gateway; the local credential is the employee JWT.
+  'system-openrouter': {
+    name: 'System OpenRouter',
+    providerType: 'pi_compat',
+    authType: 'api_key_with_endpoint',
+  },
 }
 
 // ============================================================

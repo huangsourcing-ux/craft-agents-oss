@@ -75,25 +75,18 @@ import { rendererLog } from '@/lib/logger'
 import { ActionRegistryProvider } from '@/actions'
 import { toast } from 'sonner'
 import { authClient, type EmployeeAuthSession, type EmployeeLoginCredentials } from '@/lib/auth-client'
-import { isManagedLlmMode, MANAGED_LLM_SETUP_NEEDS } from '@/lib/managed-llm'
+import {
+  isManagedLlmMode,
+  MANAGED_LLM_SETUP_NEEDS,
+  SYSTEM_OPENROUTER_CONNECTION_SLUG,
+  SYSTEM_OPENROUTER_MODEL_ID,
+  isManagedOpenRouterModelId,
+  resolveManagedOpenRouterModelId,
+  syncManagedBackendSource,
+  syncManagedLlmConnection,
+} from '@/lib/managed-llm'
 
 type AppState = 'loading' | 'login' | 'onboarding' | 'reauth' | 'workspace-picker' | 'ready'
-
-function employeeWorkspaceSlug(session: EmployeeAuthSession): string {
-  const base = `employee-${session.workspaceId}`
-  return base.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80)
-}
-
-function employeeWorkspaceName(session: EmployeeAuthSession): string {
-  return `${session.user.displayName || session.user.username} (${session.workspaceId})`
-}
-
-function authGatewayWsUrl(serverUrl: string, workspaceId: string): string {
-  const url = new URL(serverUrl)
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  url.searchParams.set('workspaceId', workspaceId)
-  return url.toString()
-}
 
 /** Type for the Jotai store returned by useStore() */
 type JotaiStore = ReturnType<typeof getDefaultStore>
@@ -102,6 +95,10 @@ type SessionListRefreshOptions = {
   removeMissing?: boolean
   reason?: string
   selectedSessionId?: string | null
+}
+
+function isLegacyManagedRemoteWorkspace(workspace: Workspace): boolean {
+  return Boolean(workspace.remoteServer && workspace.slug?.startsWith('employee-'))
 }
 
 const SESSION_REFRESH_LOG_ID_LIMIT = 25
@@ -242,6 +239,7 @@ function SessionLoadErrorScreen({
 
 export default function App() {
   const { t } = useTranslation()
+  const managedLlmMode = useMemo(() => isManagedLlmMode(), [])
 
   // Initialize renderer perf tracking early (debug mode = running from source)
   // Uses useEffect with empty deps to run once on mount before any session switches
@@ -281,6 +279,12 @@ export default function App() {
   }, [updateSessionDirect])
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const visibleWorkspaces = useMemo(() => {
+    if (!managedLlmMode) return workspaces
+    const localWorkspaces = workspaces.filter((workspace) => !workspace.remoteServer)
+    return localWorkspaces.length > 0 ? localWorkspaces : workspaces
+  }, [managedLlmMode, workspaces])
+
   // Window's workspace ID — shared atom so Root/ThemeProvider stays in sync on switch
   const [windowWorkspaceId, setWindowWorkspaceId] = useAtom(windowWorkspaceIdAtom)
 
@@ -318,6 +322,11 @@ export default function App() {
   const defaultConnection = useMemo(() => {
     return llmConnections.find(c => c.slug === defaultLlmConnectionSlug) ?? null
   }, [llmConnections, defaultLlmConnectionSlug])
+
+  const visibleLlmConnections = useMemo(() => {
+    if (!managedLlmMode) return llmConnections
+    return llmConnections.filter(connection => connection.slug === SYSTEM_OPENROUTER_CONNECTION_SLUG)
+  }, [llmConnections, managedLlmMode])
 
   const [menuNewChatTrigger, setMenuNewChatTrigger] = useState(0)
   // Permission requests per session (queue to handle multiple concurrent requests)
@@ -625,6 +634,42 @@ export default function App() {
     }
   }, [resolveDefaultConnectionSlug, windowWorkspaceId])
 
+  const normalizeManagedWorkspaceState = useCallback(async (
+    loadedWorkspaces: Workspace[],
+    currentWorkspaceId: string | null | undefined,
+  ): Promise<{ workspaces: Workspace[]; workspaceId: string | null }> => {
+    if (!managedLlmMode) {
+      return { workspaces: loadedWorkspaces, workspaceId: currentWorkspaceId ?? null }
+    }
+
+    let nextWorkspaces = loadedWorkspaces
+    let nextWorkspaceId = currentWorkspaceId ?? null
+    const firstLocalWorkspace = nextWorkspaces.find((workspace) => !workspace.remoteServer)
+    const activeWorkspace = nextWorkspaces.find((workspace) => workspace.id === nextWorkspaceId)
+
+    if (activeWorkspace?.remoteServer && firstLocalWorkspace) {
+      await window.electronAPI.switchWorkspace(firstLocalWorkspace.id)
+      nextWorkspaceId = firstLocalWorkspace.id
+    }
+
+    const staleManagedRemoteWorkspaces = nextWorkspaces.filter(isLegacyManagedRemoteWorkspace)
+    if (staleManagedRemoteWorkspaces.length > 0) {
+      for (const workspace of staleManagedRemoteWorkspaces) {
+        await window.electronAPI.removeWorkspace(workspace.id)
+      }
+      nextWorkspaces = await window.electronAPI.getWorkspaces()
+      if (!nextWorkspaceId || !nextWorkspaces.some((workspace) => workspace.id === nextWorkspaceId)) {
+        const fallbackWorkspace = nextWorkspaces.find((workspace) => !workspace.remoteServer) ?? nextWorkspaces[0]
+        nextWorkspaceId = fallbackWorkspace?.id ?? null
+        if (nextWorkspaceId) {
+          await window.electronAPI.switchWorkspace(nextWorkspaceId)
+        }
+      }
+    }
+
+    return { workspaces: nextWorkspaces, workspaceId: nextWorkspaceId }
+  }, [managedLlmMode])
+
   // Handle onboarding completion
   const handleOnboardingComplete = useCallback(async () => {
     try {
@@ -670,46 +715,28 @@ export default function App() {
     setShowResetDialog(true)
   }, [])
 
-  const ensureEmployeeRemoteWorkspace = useCallback(async (session: EmployeeAuthSession): Promise<string> => {
-    const slug = employeeWorkspaceSlug(session)
-    const remoteServer = {
-      url: authGatewayWsUrl(session.serverUrl, session.workspaceId),
-      token: session.token,
-      remoteWorkspaceId: session.workspaceId,
-    }
-    const existingWorkspaces = await window.electronAPI.getWorkspaces()
-    const existing = existingWorkspaces.find((workspace) =>
-      workspace.remoteServer?.remoteWorkspaceId === session.workspaceId ||
-      workspace.slug === slug
-    )
-
-    let workspaceId: string
-    if (existing) {
-      await window.electronAPI.updateWorkspaceRemoteServer(existing.id, remoteServer)
-      workspaceId = existing.id
-    } else {
-      const { path } = await window.electronAPI.checkWorkspaceSlug(slug)
-      const workspace = await window.electronAPI.createWorkspace(path, employeeWorkspaceName(session), remoteServer)
-      workspaceId = workspace.id
-    }
-
-    await window.electronAPI.switchWorkspace(workspaceId)
-    const updatedWorkspaces = await window.electronAPI.getWorkspaces()
-    setWorkspaces(updatedWorkspaces)
-    return workspaceId
-  }, [])
-
   const initializeAfterEmployeeAuth = useCallback(async (employeeSession?: EmployeeAuthSession) => {
     try {
-      // Get this window's workspace ID (passed via URL query param from main process)
-      const wsId = employeeSession
-        ? await ensureEmployeeRemoteWorkspace(employeeSession)
-        : await window.electronAPI.getWindowWorkspace()
+      if (employeeSession && managedLlmMode) {
+        // [FORK] Employee auth enables the server-managed model connection only.
+        // Workspace selection remains local/native so file and MCP capabilities stay available.
+        await syncManagedLlmConnection(employeeSession)
+        await refreshLlmConnections()
+      }
+
+      // Get this window's workspace ID (passed via URL query param from main process).
+      let wsId = await window.electronAPI.getWindowWorkspace()
+      if (managedLlmMode) {
+        const allWorkspaces = await window.electronAPI.getWorkspaces()
+        const normalized = await normalizeManagedWorkspaceState(allWorkspaces, wsId)
+        wsId = normalized.workspaceId
+        setWorkspaces(normalized.workspaces)
+      }
       setWindowWorkspaceId(wsId)
 
-      if (employeeSession && isManagedLlmMode()) {
+      if (employeeSession && managedLlmMode) {
         // [FORK] Employee deployments use a server-owned OpenRouter connection,
-        // so local model/account onboarding must not block the remote workspace.
+        // so local model/account onboarding must not block the local workspace.
         setSetupNeeds(MANAGED_LLM_SETUP_NEEDS)
         setAppState(wsId ? 'ready' : 'workspace-picker')
         return
@@ -735,7 +762,7 @@ export default function App() {
       // If check fails, show onboarding to be safe
       setAppState('onboarding')
     }
-  }, [ensureEmployeeRemoteWorkspace, setWindowWorkspaceId])
+  }, [managedLlmMode, normalizeManagedWorkspaceState, refreshLlmConnections, setWindowWorkspaceId])
 
   const handleEmployeeLogin = useCallback(async (credentials: EmployeeLoginCredentials) => {
     const session = await authClient.login(credentials)
@@ -758,6 +785,25 @@ export default function App() {
     initialize()
   }, [initializeAfterEmployeeAuth])
 
+  useEffect(() => {
+    if (!managedLlmMode || !windowWorkspaceId || appState !== 'ready') return
+
+    let cancelled = false
+    const sync = async () => {
+      const session = await authClient.getSession()
+      if (!session || cancelled) return
+      await syncManagedBackendSource(session, windowWorkspaceId)
+    }
+
+    sync().catch((error) => {
+      console.error('[App] Failed to sync managed backend source:', error)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [appState, managedLlmMode, windowWorkspaceId])
+
   // Session selection state
   const [sessionSelection, setSession] = useSession()
 
@@ -779,7 +825,13 @@ export default function App() {
   useEffect(() => {
     if (appState !== 'ready') return
 
-    window.electronAPI.getWorkspaces().then(setWorkspaces)
+    window.electronAPI.getWorkspaces().then(async ws => {
+      const normalized = await normalizeManagedWorkspaceState(ws, windowWorkspaceId)
+      if (normalized.workspaceId !== windowWorkspaceId) {
+        setWindowWorkspaceId(normalized.workspaceId)
+      }
+      setWorkspaces(normalized.workspaces)
+    })
     window.electronAPI.getNotificationsEnabled().then(setNotificationsEnabled).catch(() => {})
 
     // Show actionable toast for missing system dependencies (Windows only)
@@ -811,7 +863,7 @@ export default function App() {
     })
     // Load app-level theme
     window.electronAPI.getAppTheme().then(setAppTheme)
-  }, [appState, loadSessionsFromServer, resolveDefaultConnectionSlug])
+  }, [appState, loadSessionsFromServer, normalizeManagedWorkspaceState, resolveDefaultConnectionSlug, setWindowWorkspaceId, windowWorkspaceId])
 
   // Subscribe to theme change events (live updates when theme.json changes)
   useEffect(() => {
@@ -1166,13 +1218,20 @@ export default function App() {
   }, [])
 
   const handleCreateSession = useCallback(async (workspaceId: string, options?: import('../shared/types').CreateSessionOptions): Promise<Session> => {
-    const session = await window.electronAPI.createSession(workspaceId, options)
+    const resolvedOptions = managedLlmMode
+      ? {
+          ...options,
+          llmConnection: options?.llmConnection ?? SYSTEM_OPENROUTER_CONNECTION_SLUG,
+          model: resolveManagedOpenRouterModelId(options?.model ?? SYSTEM_OPENROUTER_MODEL_ID),
+        }
+      : options
+    const session = await window.electronAPI.createSession(workspaceId, resolvedOptions)
     // Add to per-session atom and metadata map (no sessionsAtom)
     addSession(session)
     syncSessionOptionsFromSession(session)
 
     return session
-  }, [addSession, syncSessionOptionsFromSession])
+  }, [addSession, managedLlmMode, syncSessionOptionsFromSession])
 
   // Deep link navigation is initialized later after handleInputChange is defined
 
@@ -1270,6 +1329,36 @@ export default function App() {
 
   const handleSendMessage = useCallback(async (sessionId: string, message: string, attachments?: FileAttachment[], skillSlugs?: string[], externalBadges?: ContentBadge[]) => {
     try {
+      const sessionBeforeSend = store.get(sessionAtomFamily(sessionId))
+      if (managedLlmMode && sessionBeforeSend) {
+        const resolvedManagedModel = resolveManagedOpenRouterModelId(sessionBeforeSend.model)
+        const shouldSetConnection =
+          sessionBeforeSend.messages.length === 0 &&
+          sessionBeforeSend.llmConnection !== SYSTEM_OPENROUTER_CONNECTION_SLUG
+        const shouldSetModel = !isManagedOpenRouterModelId(sessionBeforeSend.model)
+
+        if (shouldSetConnection) {
+          await window.electronAPI.sessionCommand(sessionId, {
+            type: 'setConnection',
+            connectionSlug: SYSTEM_OPENROUTER_CONNECTION_SLUG,
+          })
+        }
+        if (shouldSetModel && windowWorkspaceId) {
+          await window.electronAPI.setSessionModel(
+            sessionId,
+            windowWorkspaceId,
+            resolvedManagedModel,
+            SYSTEM_OPENROUTER_CONNECTION_SLUG,
+          )
+        }
+        if (shouldSetConnection || shouldSetModel) {
+          updateSessionById(sessionId, {
+            llmConnection: SYSTEM_OPENROUTER_CONNECTION_SLUG,
+            model: resolvedManagedModel,
+          })
+        }
+      }
+
       // Capture pre-send processing state so we can flag mid-stream sends
       // for the queued badge (#616 follow-up — covers Pi steer path which
       // returns status 'accepted', not 'queued').
@@ -1432,7 +1521,7 @@ export default function App() {
         ]
       }))
     }
-  }, [sessionOptions, updateSessionById, skills, sources, windowWorkspaceId])
+  }, [managedLlmMode, skills, sources, store, updateSessionById, windowWorkspaceId, windowWorkspaceSlug])
 
   /**
    * Unified handler for all session option changes.
@@ -1835,8 +1924,14 @@ export default function App() {
 
   // Handle workspace refresh (e.g., after icon upload)
   const handleRefreshWorkspaces = useCallback(() => {
-    window.electronAPI.getWorkspaces().then(setWorkspaces)
-  }, [])
+    window.electronAPI.getWorkspaces().then(async ws => {
+      const normalized = await normalizeManagedWorkspaceState(ws, windowWorkspaceId)
+      if (normalized.workspaceId !== windowWorkspaceId) {
+        setWindowWorkspaceId(normalized.workspaceId)
+      }
+      setWorkspaces(normalized.workspaces)
+    })
+  }, [normalizeManagedWorkspaceState, setWindowWorkspaceId, windowWorkspaceId])
 
   // Handle cancel during onboarding
   const handleOnboardingCancel = useCallback(() => {
@@ -1850,10 +1945,10 @@ export default function App() {
     // Data
     // NOTE: sessions is NOT included - use sessionMetaMapAtom for listing
     // and useSession(id) hook for individual sessions. This prevents memory leaks.
-    workspaces,
+    workspaces: visibleWorkspaces,
     activeWorkspaceId: windowWorkspaceId,
     activeWorkspaceSlug: windowWorkspaceSlug,
-    llmConnections,
+    llmConnections: visibleLlmConnections,
     workspaceDefaultLlmConnection,
     refreshLlmConnections,
     pendingPermissions,
@@ -1896,10 +1991,10 @@ export default function App() {
     openNewChat,
   }), [
     // NOTE: sessions removed to prevent memory leaks - components use atoms instead
-    workspaces,
+    visibleWorkspaces,
     windowWorkspaceId,
     windowWorkspaceSlug,
-    llmConnections,
+    visibleLlmConnections,
     workspaceDefaultLlmConnection,
     refreshLlmConnections,
     pendingPermissions,
@@ -2109,6 +2204,7 @@ export default function App() {
                   defaultLayout={[20, 32, 48]}
                   menuNewChatTrigger={menuNewChatTrigger}
                   isFocusedMode={isFocusedMode}
+                  managedWorkspaceMode={false}
                 />
               )}
             </div>
