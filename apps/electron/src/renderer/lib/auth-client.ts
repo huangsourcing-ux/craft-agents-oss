@@ -114,6 +114,8 @@ function clearStoredSession(): void {
 
 function buildUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) return path
+  if (getEnv().DEV && isGatewayApiPath(path)) return path
+
   const baseUrl = getGatewayBaseUrl() || getStoredGatewayBaseUrl()
   if (baseUrl) return absoluteGatewayUrl(path, baseUrl)
 
