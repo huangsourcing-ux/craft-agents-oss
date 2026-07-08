@@ -45,7 +45,7 @@ bun run packages/server/src/index.ts        # 起 headless server
 1. **登录流程改造**：把原生的"API key / OAuth"登录替换为"账号 + 密码"表单。提交目标是我们的 auth-gateway（地址来自构建时配置），由网关完成验证并返回连接信息（server URL + token），客户端拿到后自动连接 headless server。涉及 `packages/shared` 的 auth/config 部分和 `apps/electron` 的登录相关组件
 2. **隐藏配置类 UI**：普通用户不应看到 LLM 连接配置、Sources（MCP）管理、Skill 管理、workspace 创建等界面。实现方式优先"条件渲染隐藏"，而不是删除代码——删除会加大与上游的 diff
 3. **中文化**：界面文案汉化。优先集中管理（若上游无 i18n 机制，建立一个文案映射层，避免在几百个组件里散落硬编码中文）
-4. **品牌化**：应用名称、图标、logo、启动画面、主题色。资源集中在构建配置和 assets 目录。**必须移除 "Craft" / "Craft Agents" 商标元素**（上游的商标归 Craft Docs Ltd，代码可用，商标不可用）
+4. **品牌化**：应用名称、图标、logo、启动画面、主题色。资源集中在构建配置和 assets 目录。**必须移除上游商标元素**（代码可用，商标不可用）
 
 ## 4. 禁止改动的范围（红线）
 
@@ -84,4 +84,4 @@ bun run packages/server/src/index.ts        # 起 headless server
 - 不碰 `packages/core` 的核心逻辑
 - 不在代码、日志、构建产物中出现任何密钥
 - 不擅自合并 upstream
-- 对外发布物料中不出现 Craft 商标
+- 对外发布物料中不出现上游商标

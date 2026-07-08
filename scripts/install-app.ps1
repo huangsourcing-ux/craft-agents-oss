@@ -1,4 +1,4 @@
-# Craft Agents Windows Installer
+# WudiBuddy Agents Windows Installer
 # Usage: irm https://agents.craft.do/install-app.ps1 | iex
 
 & {
@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $VERSIONS_URL = "https://agents.craft.do/electron"
 $DOWNLOAD_DIR = "$env:TEMP\craft-agent-install"
-$APP_NAME = "Craft Agents"
+$APP_NAME = "WudiBuddy Agents"
 
 # Colors for output
 function Write-Info { Write-Host "> $args" -ForegroundColor Blue }
@@ -192,9 +192,9 @@ if ($actualHash -ne $checksum) {
 Write-Success "Checksum verified!"
 
 # Close the app if it's running
-$process = Get-Process -Name "Craft Agents" -ErrorAction SilentlyContinue
+$process = Get-Process -Name "WudiBuddy Agents" -ErrorAction SilentlyContinue
 if ($process) {
-    Write-Info "Closing Craft Agents..."
+    Write-Info "Closing WudiBuddy Agents..."
     $process | Stop-Process -Force
     Start-Sleep -Seconds 2
 }
@@ -229,9 +229,9 @@ Remove-Item -Path $installerPath -Force -ErrorAction SilentlyContinue
 # Add command line shortcut
 Write-Info "Adding 'craft-agents' command to PATH..."
 
-$binDir = "$env:LOCALAPPDATA\Craft Agents\bin"
+$binDir = "$env:LOCALAPPDATA\WudiBuddy Agents\bin"
 $cmdFile = "$binDir\craft-agents.cmd"
-$exePath = "$env:LOCALAPPDATA\Programs\Craft Agents\Craft Agents.exe"
+$exePath = "$env:LOCALAPPDATA\Programs\WudiBuddy Agents\WudiBuddy Agents.exe"
 
 # Create bin directory
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
@@ -255,7 +255,7 @@ Write-Host "--------------------------------------------------------------------
 Write-Host ""
 Write-Success "Installation complete!"
 Write-Host ""
-Write-Host "  Craft Agents has been installed."
+Write-Host "  WudiBuddy Agents has been installed."
 Write-Host ""
 Write-Host "  Launch from:"
 Write-Host "    - Start Menu or desktop shortcut"

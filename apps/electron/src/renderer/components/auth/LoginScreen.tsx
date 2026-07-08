@@ -48,26 +48,27 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     <div className="flex min-h-screen flex-col bg-foreground-2">
       <div className="titlebar-drag-region fixed top-0 left-0 right-0 h-[50px] z-titlebar" />
 
-      <main className="flex flex-1 items-center justify-center p-6 sm:p-8">
+      <main className="flex flex-1 items-center justify-center p-5 sm:p-8">
         <form
           onSubmit={handleSubmit}
-          className="flex w-full max-w-[28rem] flex-col items-center"
+          className="flex w-full max-w-[30rem] flex-col items-center rounded-lg border border-foreground/10 bg-background/90 px-7 py-8 shadow-modal-small backdrop-blur sm:px-9 sm:py-9"
         >
-          <div className="mb-6 flex size-16 items-center justify-center">
-            <CraftAgentsSymbol className="size-10 text-accent" />
+          <div className="mb-7 flex flex-col items-center">
+            <CraftAgentsSymbol className="h-28 w-28 object-contain" />
+            <div className="mt-4 text-sm font-medium text-muted-foreground">WudiBuddy Agents</div>
           </div>
 
           <div className="text-center">
             {/* [FORK] Company login copy avoids model/API account onboarding language. */}
-            <h1 className="text-lg font-semibold tracking-tight">公司账号登录</h1>
-            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-              使用公司账号进入工作台，无需配置 API key 或模型账号。
+            <h1 className="text-xl font-semibold">登录企业工作台</h1>
+            <p className="mt-3 max-w-[24rem] text-sm leading-6 text-muted-foreground">
+              请使用公司统一分配的账号完成身份验证。登录后将进入 WudiBuddy Agents 企业工作台。
             </p>
           </div>
 
-          <div className="mt-6 w-full space-y-4">
+          <div className="mt-7 w-full space-y-4">
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-foreground">账号</span>
+              <span className="mb-2 block text-sm font-medium text-foreground">企业账号</span>
               <div className="relative">
                 <UserRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -76,7 +77,8 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   autoComplete="username"
                   autoCapitalize="none"
                   autoCorrect="off"
-                  className="h-10 pl-9"
+                  placeholder="请输入企业账号"
+                  className="h-11 pl-9"
                   disabled={isSubmitting}
                   autoFocus
                 />
@@ -84,7 +86,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-foreground">密码</span>
+              <span className="mb-2 block text-sm font-medium text-foreground">登录密码</span>
               <div className="relative">
                 <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -92,7 +94,8 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   autoComplete="current-password"
-                  className="h-10 pl-9"
+                  placeholder="请输入登录密码"
+                  className="h-11 pl-9"
                   disabled={isSubmitting}
                 />
               </div>
@@ -108,17 +111,21 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
           <Button
             type="submit"
             disabled={!canSubmit}
-            className="mt-6 h-10 w-full max-w-[320px] rounded-lg bg-background text-foreground shadow-minimal hover:bg-foreground/5"
+            className="mt-7 h-11 w-full rounded-lg shadow-minimal"
           >
             {isSubmitting ? (
               <>
                 <Spinner className="mr-2" />
-                正在登录...
+                正在验证...
               </>
             ) : (
-              '登录'
+              '登录 WudiBuddy Agents'
             )}
           </Button>
+
+          <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
+            仅限授权员工使用。如无法登录，请联系系统管理员核验账号状态。
+          </p>
         </form>
       </main>
     </div>

@@ -101,7 +101,7 @@ export default defineConfig({
       const wsTarget = `${wsProto}://127.0.0.1:${port}`
       return {
         '/api': { target: httpTarget, changeOrigin: true, secure: false },
-        '/login': { target: httpTarget, changeOrigin: true, secure: false },
+        '^/login/?$': { target: httpTarget, changeOrigin: true, secure: false },
         '/ws': { target: wsTarget, ws: true, secure: false },
       }
     })(),

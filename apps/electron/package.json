@@ -1,12 +1,11 @@
 {
   "name": "@craft-agent/electron",
   "version": "0.11.0",
-  "description": "Electron desktop app for Craft Agents",
+  "description": "Electron desktop app for WudiBuddy Agents",
   "main": "dist/main.cjs",
   "private": true,
   "author": {
-    "name": "Craft Docs Ltd.",
-    "email": "support@craft.do"
+    "name": "Honf"
   },
   "homepage": "https://agents.craft.do",
   "license": "Apache-2.0",

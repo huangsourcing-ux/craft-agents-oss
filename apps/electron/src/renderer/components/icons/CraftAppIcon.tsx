@@ -1,4 +1,4 @@
-import craftLogo from "@/assets/craft_logo_c.svg"
+import wudiBuddyLogo from "@/assets/wudibuddy-logo-transparent.png"
 
 interface CraftAppIconProps {
   className?: string
@@ -6,16 +6,18 @@ interface CraftAppIconProps {
 }
 
 /**
- * CraftAppIcon - Displays the Craft logo (colorful "C" icon)
+ * CraftAppIcon - Displays the WudiBuddy Agents logo.
+ * Export name is kept for compatibility with existing call sites.
  */
 export function CraftAppIcon({ className, size = 64 }: CraftAppIconProps) {
   return (
     <img
-      src={craftLogo}
-      alt="Craft"
+      src={wudiBuddyLogo}
+      alt="WudiBuddy Agents"
       width={size}
       height={size}
       className={className}
+      draggable={false}
     />
   )
 }

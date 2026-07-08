@@ -43,7 +43,7 @@ export function generateCallbackPage(options: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Craft - ${title}</title>
+  <title>WudiBuddy Agents - ${title}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -63,11 +63,10 @@ export function generateCallbackPage(options: {
       /* Purple accent: oklch(0.62 0.13 293) */
       color: #8b5fb3;
       font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
-      font-size: 6px;
-      line-height: 1;
+      font-size: 24px;
+      line-height: 1.1;
       white-space: pre;
-      /* Negative letter-spacing to close gaps between block characters */
-      letter-spacing: -0.05em;
+      letter-spacing: 0;
       /* 48px above the card */
       margin-bottom: 48px;
     }
@@ -175,7 +174,7 @@ export function generateCallbackPage(options: {
       <div class="status">${statusMessage}</div>
     </div>
     <div class="hint">${isSuccess ? 'You can now return to the application.' : 'Please close this window and try again.'}</div>
-    ${deeplinkUrl ? `<a href="${deeplinkUrl}" class="return-link">Craft Agents</a>` : ''}
+    ${deeplinkUrl ? `<a href="${deeplinkUrl}" class="return-link">WudiBuddy Agents</a>` : ''}
   </div>
   <script>${autoCloseScript}</script>
 </body>

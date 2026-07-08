@@ -1,6 +1,6 @@
-# Craft Agents Electron App
+# WudiBuddy Agents Electron App
 
-The primary desktop interface for Craft Agents, built with Electron + React. Provides a multi-session inbox with chat interface for interacting with Claude via Craft workspaces.
+The primary desktop interface for WudiBuddy Agents, built with Electron + React. Provides a multi-session inbox with chat interface for interacting with Claude via WudiBuddy workspaces.
 
 ## Quick Start
 
@@ -148,7 +148,7 @@ bun run sync-secrets
 **That's it!** Now `bun run electron:dev` and `bun run electron:start` work without prompts.
 
 **How it works:**
-- `.env.1password` contains `op://` references to the `Dev_Craft_Agents` vault
+- `.env.1password` contains `op://` references to the `Dev_WudiBuddy_Agents` vault
 - `bun run sync-secrets` resolves references → writes `.env` (gitignored)
 - Secrets are baked into the build at compile time via esbuild `--define` flags
 
@@ -171,7 +171,7 @@ bun run electron:build           # All of the above
 
 ## macOS Liquid Glass Icon
 
-The app includes a pre-compiled `Assets.car` for macOS 26+ Liquid Glass icons. This enables the layered glass effect on macOS Tahoe. On older macOS versions, the app falls back to `icon.icns`.
+The app can include a pre-compiled `Assets.car` for macOS 26+ Liquid Glass icons. When that file is absent, packaged builds fall back to `icon.icns`.
 
 **Regenerating after icon changes:**
 
@@ -184,7 +184,7 @@ xcrun actool "resources/icon.icon" --compile "resources" \
   --platform macosx --output-partial-info-plist /dev/null
 ```
 
-> **Note:** This requires macOS 26 with Xcode 26 (macOS 26 SDK). The pre-compiled Assets.car is committed to the repo so CI builds work without the SDK.
+> **Note:** This requires macOS 26 with Xcode 26 (macOS 26 SDK). If that toolchain is unavailable, leave `Assets.car` out of the repo and rely on the regenerated `icon.icns` fallback.
 
 ## Debugging
 
@@ -203,7 +203,7 @@ DevTools opens automatically (configured in `index.ts`). Remove `mainWindow.webC
 - **Session persistence** - Sessions, messages, and names are saved to disk
 - **File attachments** - Attach images, PDFs, and code files to messages
 - **AI-generated titles** - Sessions get automatic titles after first exchange
-- **Subagent support** - Load and apply agent definitions from Craft documents
+- **Subagent support** - Load and apply agent definitions from workspace documents
 - **Shell integration** - Open URLs in browser, open files in default apps
 - **Permission modes** - Three-level permission system (Explore, Ask to Edit, Auto)
 - **Background tasks** - Run long-running tasks in background with progress tracking

@@ -1,14 +1,11 @@
 /**
- * Centralized branding assets for Craft Agent
+ * Centralized branding assets for WudiBuddy Agents
  * Used by OAuth callback pages
  */
 
 export const CRAFT_LOGO = [
-  '  ████████ █████████    ██████   ██████████ ██████████',
-  '██████████ ██████████ ██████████ █████████  ██████████',
-  '██████     ██████████ ██████████ ████████   ██████████',
-  '██████████ ████████   ██████████ ███████      ██████  ',
-  '  ████████ ████  ████ ████  ████ █████        ██████  ',
+  'WudiBuddy',
+  'Agents',
 ] as const;
 
 /** Logo as a single string for HTML templates */

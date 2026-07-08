@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Craft Agents - Login</title>
+  <title>WudiBuddy Agents - 登录</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   <link rel="icon" type="image/x-icon" href="./favicon.ico" />
   <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
@@ -14,21 +14,19 @@
   <style>
     :root {
       color-scheme: light dark;
-      --page-bg: #f8f8fa;
-      --page-fg: #1a1a2e;
-      --card-bg: rgba(255, 255, 255, 0.86);
-      --card-border: rgba(228, 228, 232, 0.9);
-      --card-shadow: 0 32px 96px rgba(41, 25, 63, 0.14), 0 16px 40px rgba(41, 25, 63, 0.08);
-      --subtitle: rgba(26, 26, 46, 0.56);
-      --input-bg: rgba(255, 255, 255, 0.72);
-      --input-border: rgba(212, 212, 216, 0.95);
-      --placeholder: rgba(26, 26, 46, 0.34);
-      --accent: #6d5dfc;
-      --accent-hover: #5a4be0;
-      --ambient-strong: rgba(104, 78, 133, 0.18);
-      --ambient-soft: rgba(104, 78, 133, 0.1);
-      --grain-1: rgba(104, 78, 133, 0.055);
-      --grain-2: rgba(104, 78, 133, 0.03);
+      --page-bg: #f3f6fa;
+      --page-fg: #172033;
+      --panel-bg: rgba(255, 255, 255, 0.94);
+      --panel-border: rgba(205, 214, 226, 0.9);
+      --panel-shadow: 0 24px 60px rgba(23, 32, 51, 0.12), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+      --subtitle: rgba(23, 32, 51, 0.62);
+      --muted: rgba(23, 32, 51, 0.5);
+      --input-bg: #ffffff;
+      --input-border: #ccd6e2;
+      --placeholder: rgba(23, 32, 51, 0.38);
+      --accent: #0f172a;
+      --accent-hover: #1f2937;
+      --focus: rgba(0, 132, 255, 0.18);
       --error-bg: #fef2f2;
       --error-border: #fecaca;
       --error-fg: #b91c1c;
@@ -42,88 +40,92 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      overflow: hidden;
+      overflow: auto;
       position: relative;
-      isolation: isolate;
-      background: var(--page-bg);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(243, 246, 250, 0.94)),
+        var(--page-bg);
       color: var(--page-fg);
       padding: 16px;
     }
 
-    body::before,
-    body::after {
+    body::before {
       content: '';
-      position: absolute;
+      position: fixed;
       inset: 0;
       pointer-events: none;
+      background-image: linear-gradient(rgba(23, 32, 51, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(23, 32, 51, 0.035) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 78%);
     }
 
-    body::before {
-      inset: -18%;
-      background:
-        radial-gradient(circle at 18% 20%, var(--ambient-strong) 0, transparent 34%),
-        radial-gradient(circle at 82% 18%, var(--ambient-soft) 0, transparent 28%),
-        radial-gradient(circle at 76% 76%, rgba(104, 78, 133, 0.16) 0, transparent 34%),
-        radial-gradient(circle at 30% 78%, rgba(104, 78, 133, 0.11) 0, transparent 30%);
-      filter: blur(44px);
-      opacity: 0.95;
-      transform: scale(1.08);
-      animation: drift 24s ease-in-out infinite alternate;
-    }
-
-    body::after {
-      background:
-        radial-gradient(circle at center, rgba(104, 78, 133, 0.06), transparent 58%),
-        repeating-linear-gradient(135deg, var(--grain-1) 0 1px, transparent 1px 7px),
-        repeating-linear-gradient(45deg, var(--grain-2) 0 1px, transparent 1px 11px);
-      opacity: 0.45;
-      mix-blend-mode: multiply;
-    }
-
-    .card {
+    .panel {
       position: relative;
       z-index: 1;
       width: 100%;
-      max-width: 28rem;
-      padding: 32px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 20px;
+      max-width: 30rem;
+      padding: 36px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
       text-align: center;
-      box-shadow: var(--card-shadow);
-      backdrop-filter: blur(24px) saturate(140%);
-      -webkit-backdrop-filter: blur(24px) saturate(140%);
+      box-shadow: var(--panel-shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+
+    .brand-logo {
+      width: 132px;
+      height: 132px;
+      object-fit: contain;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .brand-name {
+      margin-top: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
     }
 
     h1 {
-      font-size: 20px;
+      font-size: 24px;
       font-weight: 600;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
     }
 
     .subtitle {
-      margin: 0 auto 28px;
-      max-width: 20rem;
-      font-size: 13px;
-      line-height: 1.5;
+      margin: 0 auto 30px;
+      max-width: 23rem;
+      font-size: 14px;
+      line-height: 1.65;
       color: var(--subtitle);
     }
 
     label {
       display: block;
       text-align: left;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 500;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     .field + .field {
-      margin-top: 14px;
+      margin-top: 16px;
     }
 
     input {
       width: 100%;
-      padding: 10px 12px;
+      height: 44px;
+      padding: 0 12px;
       font-size: 14px;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       border: 1px solid var(--input-border);
@@ -140,36 +142,42 @@
 
     input:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(109, 93, 252, 0.1);
+      box-shadow: 0 0 0 3px var(--focus);
     }
 
     button {
       width: 100%;
-      margin-top: 20px;
-      padding: 10px;
+      height: 44px;
+      margin-top: 24px;
+      padding: 0 14px;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
       font-family: 'Inter', sans-serif;
       color: white;
-      background: linear-gradient(180deg, #7b6dff 0%, var(--accent) 100%);
+      background: var(--accent);
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: transform 0.15s, filter 0.15s, background 0.15s;
-      box-shadow: 0 10px 24px rgba(109, 93, 252, 0.28);
+      transition: background 0.15s, box-shadow 0.15s;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
     }
 
     button:hover {
-      background: linear-gradient(180deg, #705fff 0%, var(--accent-hover) 100%);
-      transform: translateY(-1px);
-      filter: brightness(1.02);
+      background: var(--accent-hover);
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.2);
     }
 
     button:disabled {
       opacity: 0.6;
       cursor: not-allowed;
-      transform: none;
-      filter: none;
+      box-shadow: none;
+    }
+
+    .notice {
+      margin-top: 16px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--muted);
     }
 
     .error {
@@ -181,65 +189,78 @@
       border: 1px solid var(--error-border);
       border-radius: 8px;
       color: var(--error-fg);
+      text-align: left;
     }
 
     .error.visible { display: block; }
 
-    @keyframes drift {
-      from { transform: scale(1.08) translate3d(-2%, -1%, 0); }
-      to { transform: scale(1.12) translate3d(2%, 1.5%, 0); }
-    }
-
     @media (prefers-reduced-motion: reduce) {
-      body::before {
-        animation: none;
-      }
-
       button {
         transition: background 0.15s;
-      }
-
-      button:hover {
-        transform: none;
-        filter: none;
       }
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
-        --page-bg: #0f0f14;
-        --page-fg: #e0e0e8;
-        --card-bg: rgba(26, 26, 34, 0.82);
-        --card-border: rgba(42, 42, 53, 0.95);
-        --card-shadow: 0 32px 96px rgba(0, 0, 0, 0.42), 0 16px 40px rgba(0, 0, 0, 0.24);
-        --subtitle: rgba(224, 224, 232, 0.64);
-        --input-bg: rgba(15, 15, 20, 0.72);
-        --input-border: rgba(42, 42, 53, 0.95);
+        --page-bg: #10141b;
+        --page-fg: #edf2f7;
+        --panel-bg: rgba(19, 24, 32, 0.94);
+        --panel-border: rgba(67, 78, 94, 0.82);
+        --panel-shadow: 0 24px 70px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+        --subtitle: rgba(237, 242, 247, 0.66);
+        --muted: rgba(237, 242, 247, 0.54);
+        --input-bg: rgba(11, 15, 21, 0.82);
+        --input-border: rgba(67, 78, 94, 0.9);
         --placeholder: rgba(224, 224, 232, 0.32);
-        --ambient-strong: rgba(155, 123, 184, 0.22);
-        --ambient-soft: rgba(155, 123, 184, 0.12);
-        --grain-1: rgba(155, 123, 184, 0.06);
-        --grain-2: rgba(155, 123, 184, 0.035);
+        --accent: #edf2f7;
+        --accent-hover: #dbe5ef;
+        --focus: rgba(56, 189, 248, 0.18);
         --error-bg: #2d1a1a;
         --error-border: #5a2020;
         --error-fg: #f5a0a0;
+      }
+
+      body {
+        background:
+          linear-gradient(180deg, rgba(16, 20, 27, 0.96), rgba(20, 26, 35, 0.98)),
+          var(--page-bg);
+      }
+
+      button {
+        color: #10141b;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .panel {
+        padding: 28px 22px;
+      }
+
+      .brand-logo {
+        width: 112px;
+        height: 112px;
       }
     }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Craft Agents</h1>
-    <p class="subtitle">Sign in with your company account to continue</p>
+  <div class="panel">
+    <div class="brand">
+      <img class="brand-logo" src="./icon-512.png" alt="WudiBuddy Agents">
+      <div class="brand-name">WudiBuddy Agents</div>
+    </div>
+
+    <h1>登录企业工作台</h1>
+    <p class="subtitle">请使用公司统一分配的账号完成身份验证。登录后将进入 WudiBuddy Agents 企业工作台。</p>
 
     <form id="login-form">
       <div class="field">
-        <label for="username">Username</label>
+        <label for="username">企业账号</label>
         <input
           id="username"
           name="username"
           type="text"
-          placeholder="Enter your username"
+          placeholder="请输入企业账号"
           autocomplete="username"
           autocapitalize="none"
           autocorrect="off"
@@ -248,19 +269,20 @@
         >
       </div>
       <div class="field">
-        <label for="password">Password</label>
+        <label for="password">登录密码</label>
         <input
           id="password"
           name="password"
           type="password"
-          placeholder="Enter your password"
+          placeholder="请输入登录密码"
           autocomplete="current-password"
           required
         >
       </div>
-      <button type="submit" id="submit-btn">Sign In</button>
+      <button type="submit" id="submit-btn">登录 WudiBuddy Agents</button>
     </form>
 
+    <p class="notice">仅限授权员工使用。如无法登录，请联系系统管理员核验账号状态。</p>
     <div id="error" class="error"></div>
   </div>
 
@@ -273,7 +295,7 @@
       e.preventDefault();
       errorEl.classList.remove('visible');
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Signing in...';
+      submitBtn.textContent = '正在验证...';
 
       try {
         const username = document.getElementById('username').value.trim();
@@ -291,14 +313,14 @@
         }
 
         const data = await res.json().catch(() => ({}));
-        errorEl.textContent = data.error || 'Authentication failed';
+        errorEl.textContent = data.error || '账号或密码不正确，请核对后重试。';
         errorEl.classList.add('visible');
       } catch (err) {
-        errorEl.textContent = 'Network error — is the server running?';
+        errorEl.textContent = '暂时无法连接认证服务，请检查网络后重试。';
         errorEl.classList.add('visible');
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Sign In';
+        submitBtn.textContent = '登录 WudiBuddy Agents';
       }
     });
   </script>
