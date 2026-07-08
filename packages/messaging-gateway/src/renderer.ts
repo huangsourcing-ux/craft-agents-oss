@@ -505,7 +505,7 @@ export class Renderer {
       state.lastEditedLength = 0
     }
 
-    if (binding.platform === 'whatsapp') {
+    if (binding.platform === 'whatsapp' || binding.platform === 'wecom') {
       await adapter.sendText(
         binding.channelId,
         `⏸ Permission required: ${request.description}
@@ -537,7 +537,7 @@ Approve in the desktop app to continue.`,
     binding: ChannelBinding,
     adapter: PlatformAdapter,
   ): Promise<void> {
-    if (binding.platform !== 'whatsapp') return
+    if (binding.platform !== 'whatsapp' && binding.platform !== 'wecom') return
     await adapter.sendText(
       binding.channelId,
       '🔐 Credentials are required to continue. Open the desktop app to review and submit them securely.',
@@ -550,8 +550,9 @@ Approve in the desktop app to continue.`,
     binding: ChannelBinding,
     adapter: PlatformAdapter,
   ): Promise<void> {
-    // WhatsApp: no interactive buttons yet — keep the generic pointer.
-    if (binding.platform === 'whatsapp') {
+    // Platforms without interactive buttons get a plain pointer instead of
+    // silently dropping the review request.
+    if (!adapter.capabilities.inlineButtons) {
       await adapter.sendText(
         binding.channelId,
         '📝 A plan is ready for review. Open the desktop app to inspect and approve it.',
@@ -561,8 +562,7 @@ Approve in the desktop app to continue.`,
     }
 
     // Telegram + Lark both support inline buttons through the same
-    // `sendButtons` contract; either gets the rich plan card. Anything else
-    // is treated like WhatsApp above and gated out earlier.
+    // `sendButtons` contract; either gets the rich plan card.
     if (binding.platform !== 'telegram' && binding.platform !== 'lark') return
 
     // Token registry is optional for backwards compatibility; without it we

@@ -59,16 +59,13 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
           </div>
 
           <div className="text-center">
-            {/* [FORK] Company login copy avoids model/API account onboarding language. */}
-            <h1 className="text-xl font-semibold">登录企业工作台</h1>
-            <p className="mt-3 max-w-[24rem] text-sm leading-6 text-muted-foreground">
-              请使用公司统一分配的账号完成身份验证。登录后将进入 WudiBuddy Agents 企业工作台。
-            </p>
+            {/* [FORK] Keep employee login copy minimal and brand-focused. */}
+            <h1 className="text-xl font-semibold">登录WudiBuddy Agents</h1>
           </div>
 
           <div className="mt-7 w-full space-y-4">
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-foreground">企业账号</span>
+              <span className="mb-2 block text-sm font-medium text-foreground">账号</span>
               <div className="relative">
                 <UserRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -77,7 +74,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   autoComplete="username"
                   autoCapitalize="none"
                   autoCorrect="off"
-                  placeholder="请输入企业账号"
+                  placeholder="请输入账号"
                   className="h-11 pl-9"
                   disabled={isSubmitting}
                   autoFocus
@@ -86,7 +83,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-foreground">登录密码</span>
+              <span className="mb-2 block text-sm font-medium text-foreground">密码</span>
               <div className="relative">
                 <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -94,7 +91,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   autoComplete="current-password"
-                  placeholder="请输入登录密码"
+                  placeholder="请输入密码"
                   className="h-11 pl-9"
                   disabled={isSubmitting}
                 />
@@ -116,16 +113,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             {isSubmitting ? (
               <>
                 <Spinner className="mr-2" />
-                正在验证...
+                登录WudiBuddy Agents
               </>
             ) : (
-              '登录 WudiBuddy Agents'
+              '登录WudiBuddy Agents'
             )}
           </Button>
-
-          <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-            仅限授权员工使用。如无法登录，请联系系统管理员核验账号状态。
-          </p>
         </form>
       </main>
     </div>

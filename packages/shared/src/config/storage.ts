@@ -1068,6 +1068,8 @@ export function clearWorkspacePlan(workspaceId: string): void {
 // Two shapes for attachments:
 //  - Track P: { path, name } — absolute path captured via webUtils.getPathForFile
 //    (file-picker / OS drag). Re-read on hydrate via file:readUserAttachment RPC.
+//    [FORK] Large path-only attachments may add content metadata without bytes so
+//    the renderer can restore the draft chip without reading the large file.
 //  - Track C: { path, name, content } — inline content for paste / web-drag Files
 //    that never existed on disk. Hydrate reconstructs directly from the stored bytes.
 // ============================================
@@ -1086,8 +1088,8 @@ export interface DraftAttachmentContent {
 export interface DraftAttachmentRef {
   path: string;
   name: string;
-  /** Inline content for attachments without a real filesystem path (paste, web-drag).
-   *  When present, hydrate reconstructs from these bytes and skips any disk read. */
+  /** Inline content for synthetic-path attachments, or metadata-only content for
+   *  [FORK] large path-only attachments. When present, hydrate skips disk read. */
   content?: DraftAttachmentContent;
 }
 

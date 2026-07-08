@@ -104,6 +104,26 @@ describe('toDraftRef', () => {
     // Track P: just path+name, content never inlined — cap doesn't apply
     expect(ref).toEqual({ path: '/Users/me/huge.png', name: 'huge.png' })
   })
+
+  it('persists lightweight metadata for path-only large attachments', () => {
+    const ref = toDraftRef({
+      type: 'office',
+      path: '/Users/me/huge.xlsx',
+      name: 'huge.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      size: CONTENT_PERSIST_CAP + 1,
+    })
+
+    expect(ref).toEqual({
+      path: '/Users/me/huge.xlsx',
+      name: 'huge.xlsx',
+      content: {
+        type: 'office',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        size: CONTENT_PERSIST_CAP + 1,
+      },
+    })
+  })
 })
 
 describe('attachmentFromContentRef', () => {
@@ -128,5 +148,28 @@ describe('attachmentFromContentRef', () => {
   it('returns null for refs without content (Track P case — caller must use RPC instead)', () => {
     const restored = attachmentFromContentRef({ path: '/Users/me/a.png', name: 'a.png' })
     expect(restored).toBeNull()
+  })
+
+  it('restores path-only metadata refs without inline base64/text content', () => {
+    const restored = attachmentFromContentRef({
+      path: '/Users/me/huge.xlsx',
+      name: 'huge.xlsx',
+      content: {
+        type: 'office',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        size: CONTENT_PERSIST_CAP + 1,
+      },
+    })
+
+    expect(restored).toEqual({
+      type: 'office',
+      path: '/Users/me/huge.xlsx',
+      name: 'huge.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      size: CONTENT_PERSIST_CAP + 1,
+      base64: undefined,
+      text: undefined,
+      thumbnailBase64: undefined,
+    })
   })
 })

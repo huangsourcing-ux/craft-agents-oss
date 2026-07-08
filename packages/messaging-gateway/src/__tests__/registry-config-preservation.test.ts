@@ -54,6 +54,24 @@ function makeRegistry() {
   return { registry, workspaceId: 'ws-test' }
 }
 
+function makeTrackingCredentialManager(initial = new Map<string, string>()) {
+  const deleted: string[] = []
+  const manager = {
+    get: async ({ name }: { name: string }) => {
+      const value = initial.get(name)
+      return value ? { value } : null
+    },
+    set: async ({ name }: { name: string }, payload: { value: string }) => {
+      initial.set(name, payload.value)
+    },
+    delete: async ({ name }: { name: string }) => {
+      deleted.push(name)
+      initial.delete(name)
+    },
+  } as unknown as CredentialManager
+  return { manager, deleted, store: initial }
+}
+
 function makeFakeTelegramAdapter(): PlatformAdapter {
   return {
     platform: 'telegram',
@@ -184,5 +202,40 @@ describe('MessagingGatewayRegistry — lock-down migrates open bindings', () => 
 
     const reloaded = store.getAll().find((x: { id: string }) => x.id === wa.id)
     expect(reloaded.config.accessMode).toBe('open')
+  })
+})
+
+describe('MessagingGatewayRegistry — WeCom config secrecy', () => {
+  it('exposes only non-sensitive WeCom config and deletes credentials on disconnect', async () => {
+    const credentials = makeTrackingCredentialManager(new Map([
+      ['wecom', JSON.stringify({ botId: 'aib-test', secret: 'do-not-leak' })],
+    ]))
+    const registry = new MessagingGatewayRegistry({
+      sessionManager: stubSessionManager(),
+      credentialManager: credentials.manager,
+      getMessagingDir: (workspaceId: string) =>
+        join(dir, 'workspaces', workspaceId, 'messaging'),
+      whatsapp: { workerEntry: '/dev/null' },
+    })
+    const workspaceId = 'ws-wecom'
+
+    await registry.updateConfig(workspaceId, {
+      enabled: true,
+      platforms: {
+        wecom: { enabled: true, wsUrl: 'wss://example.test/ws' },
+      },
+    })
+
+    const before = registry.getConfig(workspaceId)
+    expect(before?.platforms.wecom?.wsUrl).toBe('wss://example.test/ws')
+    expect(JSON.stringify(before)).not.toContain('do-not-leak')
+
+    await registry.disconnectPlatform(workspaceId, 'wecom')
+
+    expect(credentials.deleted).toContain('wecom')
+    expect(credentials.store.has('wecom')).toBe(false)
+    const after = registry.getConfig(workspaceId)
+    expect(after?.platforms.wecom?.enabled).toBe(false)
+    expect(JSON.stringify(after)).not.toContain('do-not-leak')
   })
 })

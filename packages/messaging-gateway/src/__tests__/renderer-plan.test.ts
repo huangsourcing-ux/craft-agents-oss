@@ -5,7 +5,7 @@
  *   - Telegram + short plan: single sendButtons with inline content
  *   - Telegram + long plan: sendButtons with summary + sendFile attachment
  *   - Telegram without token registry: falls back to plain text
- *   - WhatsApp: keeps the legacy plain-text pointer (no buttons, no file)
+ *   - WhatsApp / WeCom: plain-text pointer (no buttons, no file)
  *   - Lark: same rich-card flow as Telegram (buttons + optional file)
  *   - recordPlanMessage callback fires for both Telegram and Lark
  */
@@ -45,6 +45,7 @@ function makeAdapter(platform: PlatformType = 'telegram'): PlatformAdapter & { c
     telegram: 'v2',
     lark: 'lark-post',
     whatsapp: 'whatsapp',
+    wecom: 'wecom-markdown',
   }
   const caps: AdapterCapabilities = {
     messageEditing: true,
@@ -173,6 +174,19 @@ describe('Renderer — plan_submitted', () => {
     const renderer = new Renderer({ planTokens: tokens })
     const adapter = makeAdapter('whatsapp')
     const binding = makeBinding('whatsapp')
+
+    await renderer.handle(planEvent('# Plan'), binding, adapter)
+
+    expect(adapter.calls).toHaveLength(1)
+    expect(adapter.calls[0]?.kind).toBe('sendText')
+    expect(adapter.calls[0]?.text).toContain('Open the desktop app')
+  })
+
+  it('WeCom: plain-text pointer, no buttons, no file', async () => {
+    const tokens = new PlanTokenRegistry()
+    const renderer = new Renderer({ planTokens: tokens })
+    const adapter = makeAdapter('wecom')
+    const binding = makeBinding('wecom')
 
     await renderer.handle(planEvent('# Plan'), binding, adapter)
 

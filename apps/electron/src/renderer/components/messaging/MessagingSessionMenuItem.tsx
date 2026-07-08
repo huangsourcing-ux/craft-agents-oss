@@ -1,7 +1,7 @@
 /**
  * MessagingSessionMenuItem
  *
- * The "Connect Messaging → Telegram / WhatsApp" submenu block shared by
+ * The "Connect Messaging → Telegram / WhatsApp / Lark / WeCom" submenu block shared by
  * SessionMenu (real context/dropdown menus) and the playground preview.
  *
  * Behavior:
@@ -27,7 +27,7 @@ import { navigate, routes } from '@/lib/navigate'
 import { useMenuComponents } from '@/components/ui/menu-context'
 import { messagingDialogAtom } from '@/atoms/messaging'
 
-export type MessagingPlatform = 'telegram' | 'whatsapp' | 'lark'
+export type MessagingPlatform = 'telegram' | 'whatsapp' | 'lark' | 'wecom'
 
 export interface UseMessagingConnectOptions {
   /** Session to bind the pairing code to. */
@@ -72,10 +72,10 @@ export function useMessagingConnect({
         } else if (onTelegramNotConfigured) {
           onTelegramNotConfigured()
         } else {
-          // Telegram + Lark share the "open Settings" path — both use
+          // Telegram + Lark + WeCom share the "open Settings" path — all use
           // a Settings dialog rather than an inline connect flow.
           navigate(routes.view.settings('messaging'))
-          toast.info(t('toast.telegramNotConfiguredOpenSettings'))
+          toast.info(t('toast.messagingPlatformNotConfiguredOpenSettings'))
         }
         return
       }
@@ -135,6 +135,9 @@ export function MessagingSessionMenuItem(props: MessagingSessionMenuItemProps) {
         </MenuItem>
         <MenuItem onClick={() => handleConnectMessaging('lark')}>
           <span>Lark / Feishu</span>
+        </MenuItem>
+        <MenuItem onClick={() => handleConnectMessaging('wecom')}>
+          <span>WeCom</span>
         </MenuItem>
       </SubContent>
     </Sub>

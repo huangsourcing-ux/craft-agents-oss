@@ -699,7 +699,7 @@ export interface ElectronAPI {
   // Messaging gateway — workspaceId is taken from the client handshake (ctx.workspaceId)
   getMessagingConfig(): Promise<{
     enabled: boolean
-    platforms: Record<string, { enabled: boolean; accessMode?: MessagingPlatformAccessMode; owners?: MessagingPlatformOwnerInfo[] } | undefined>
+    platforms: Record<string, { enabled: boolean; accessMode?: MessagingPlatformAccessMode; owners?: MessagingPlatformOwnerInfo[]; domain?: 'lark' | 'feishu'; selfChatMode?: boolean; wsUrl?: string } | undefined>
     runtime: Record<string, MessagingPlatformRuntimeInfo | undefined>
   } | null>
   updateMessagingConfig(config: Record<string, unknown>): Promise<void>
@@ -707,6 +707,8 @@ export interface ElectronAPI {
   saveTelegramToken(token: string): Promise<void>
   testLarkCredentials(creds: { appId: string; appSecret: string; domain: 'lark' | 'feishu' }): Promise<{ success: boolean; botName?: string; error?: string }>
   saveLarkCredentials(creds: { appId: string; appSecret: string; domain: 'lark' | 'feishu' }): Promise<void>
+  testWeComCredentials(creds: WeComCredentialInput): Promise<{ success: boolean; error?: string }>
+  saveWeComCredentials(creds: WeComCredentialInput): Promise<void>
   disconnectMessagingPlatform(platform: string): Promise<void>
   forgetMessagingPlatform(platform: string): Promise<void>
   getMessagingBindings(): Promise<Array<{ id: string; workspaceId: string; sessionId: string; platform: string; channelId: string; threadId?: number; channelName?: string; enabled: boolean; createdAt: number; accessMode?: MessagingBindingAccessMode; allowedSenderIds?: string[] }>>
@@ -749,6 +751,12 @@ export interface MessagingPlatformRuntimeInfo {
   identity?: string
   lastError?: string
   updatedAt: number
+}
+
+export interface WeComCredentialInput {
+  botId: string
+  secret: string
+  wsUrl?: string
 }
 
 /**

@@ -19,7 +19,6 @@
       --panel-bg: rgba(255, 255, 255, 0.94);
       --panel-border: rgba(205, 214, 226, 0.9);
       --panel-shadow: 0 24px 60px rgba(23, 32, 51, 0.12), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
-      --subtitle: rgba(23, 32, 51, 0.62);
       --muted: rgba(23, 32, 51, 0.5);
       --input-bg: #ffffff;
       --input-border: #ccd6e2;
@@ -99,15 +98,7 @@
     h1 {
       font-size: 24px;
       font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    .subtitle {
-      margin: 0 auto 30px;
-      max-width: 23rem;
-      font-size: 14px;
-      line-height: 1.65;
-      color: var(--subtitle);
+      margin-bottom: 30px;
     }
 
     label {
@@ -173,13 +164,6 @@
       box-shadow: none;
     }
 
-    .notice {
-      margin-top: 16px;
-      font-size: 12px;
-      line-height: 1.6;
-      color: var(--muted);
-    }
-
     .error {
       display: none;
       margin-top: 16px;
@@ -207,7 +191,6 @@
         --panel-bg: rgba(19, 24, 32, 0.94);
         --panel-border: rgba(67, 78, 94, 0.82);
         --panel-shadow: 0 24px 70px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-        --subtitle: rgba(237, 242, 247, 0.66);
         --muted: rgba(237, 242, 247, 0.54);
         --input-bg: rgba(11, 15, 21, 0.82);
         --input-border: rgba(67, 78, 94, 0.9);
@@ -250,17 +233,17 @@
       <div class="brand-name">WudiBuddy Agents</div>
     </div>
 
-    <h1>登录企业工作台</h1>
-    <p class="subtitle">请使用公司统一分配的账号完成身份验证。登录后将进入 WudiBuddy Agents 企业工作台。</p>
+    <!-- [FORK] Keep employee login copy minimal and brand-focused. -->
+    <h1>登录WudiBuddy Agents</h1>
 
     <form id="login-form">
       <div class="field">
-        <label for="username">企业账号</label>
+        <label for="username">账号</label>
         <input
           id="username"
           name="username"
           type="text"
-          placeholder="请输入企业账号"
+          placeholder="请输入账号"
           autocomplete="username"
           autocapitalize="none"
           autocorrect="off"
@@ -269,20 +252,19 @@
         >
       </div>
       <div class="field">
-        <label for="password">登录密码</label>
+        <label for="password">密码</label>
         <input
           id="password"
           name="password"
           type="password"
-          placeholder="请输入登录密码"
+          placeholder="请输入密码"
           autocomplete="current-password"
           required
         >
       </div>
-      <button type="submit" id="submit-btn">登录 WudiBuddy Agents</button>
+      <button type="submit" id="submit-btn">登录WudiBuddy Agents</button>
     </form>
 
-    <p class="notice">仅限授权员工使用。如无法登录，请联系系统管理员核验账号状态。</p>
     <div id="error" class="error"></div>
   </div>
 
@@ -295,7 +277,7 @@
       e.preventDefault();
       errorEl.classList.remove('visible');
       submitBtn.disabled = true;
-      submitBtn.textContent = '正在验证...';
+      submitBtn.textContent = '登录WudiBuddy Agents';
 
       try {
         const username = document.getElementById('username').value.trim();
@@ -320,7 +302,7 @@
         errorEl.classList.add('visible');
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = '登录 WudiBuddy Agents';
+        submitBtn.textContent = '登录WudiBuddy Agents';
       }
     });
   </script>

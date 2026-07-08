@@ -9,7 +9,7 @@
 // Platform types
 // ---------------------------------------------------------------------------
 
-export type PlatformType = 'telegram' | 'whatsapp' | 'lark'
+export type PlatformType = 'telegram' | 'whatsapp' | 'lark' | 'wecom'
 
 // ---------------------------------------------------------------------------
 // Logger
@@ -70,7 +70,7 @@ export interface AdapterCapabilities {
   inlineButtons: boolean
   maxButtons: number
   maxMessageLength: number
-  markdown: 'v2' | 'whatsapp' | 'lark-post'
+  markdown: 'v2' | 'whatsapp' | 'lark-post' | 'wecom-markdown'
   webhookSupport: boolean
 }
 
@@ -301,7 +301,10 @@ export const DEFAULT_BINDING_CONFIG: BindingConfig = {
 export function getDefaultBindingConfig(platform: PlatformType): BindingConfig {
   return {
     ...DEFAULT_BINDING_CONFIG,
-    approvalChannel: platform === 'whatsapp' ? 'app' : DEFAULT_BINDING_CONFIG.approvalChannel,
+    approvalChannel:
+      platform === 'whatsapp' || platform === 'wecom'
+        ? 'app'
+        : DEFAULT_BINDING_CONFIG.approvalChannel,
   }
 }
 
@@ -328,7 +331,10 @@ export function normalizeBindingConfig(
     ...base,
     ...config,
     responseMode: resolvedResponseMode,
-    approvalChannel: platform === 'whatsapp' ? 'app' : (config?.approvalChannel ?? base.approvalChannel),
+    approvalChannel:
+      platform === 'whatsapp' || platform === 'wecom'
+        ? 'app'
+        : (config?.approvalChannel ?? base.approvalChannel),
     accessMode,
     allowedSenderIds,
   }
@@ -508,6 +514,14 @@ export interface MessagingConfig {
        *  - `feishu` → open.feishu.cn (China)
        */
       domain?: 'lark' | 'feishu'
+    }
+    wecom?: {
+      enabled: boolean
+      /**
+       * Optional custom WebSocket endpoint for private WeCom deployments.
+       * Public WeCom bots use the SDK default (`wss://openws.work.weixin.qq.com`).
+       */
+      wsUrl?: string
     }
   }
 }

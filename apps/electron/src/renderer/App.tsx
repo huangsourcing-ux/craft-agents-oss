@@ -31,6 +31,11 @@ import { navigate, routes } from './lib/navigate'
 import { attachmentFromContentRef, toDraftRef } from './lib/drafts'
 import { stripMarkdown } from './utils/text'
 import { coerceInputText } from './lib/input-text'
+import {
+  canUsePathOnlyAttachment,
+  createPathOnlyStoredAttachment,
+  isPathOnlyAttachment,
+} from './lib/large-attachments'
 import { getSessionsToRefreshAfterStaleReconnect } from './lib/reconnect-recovery'
 import { formatSessionLoadFailure, shouldTreatSessionLoadFailureAsTransportFallback } from './lib/session-load'
 import { extractWorkspaceSlugFromPath } from '@craft-agent/shared/utils/workspace-slug'
@@ -126,6 +131,10 @@ function workspaceDistribution(sessions: Iterable<{ workspaceId?: string }>): Re
     distribution[key] = (distribution[key] ?? 0) + 1
   }
   return distribution
+}
+
+function createAttachmentId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? generateMessageId()
 }
 
 /**
@@ -1438,10 +1447,23 @@ export default function App() {
       let processedAttachments: FileAttachment[] | undefined
 
       if (attachments?.length) {
-        // Store each attachment to disk (generates thumbnails, converts Office→markdown)
+        const transportState = await window.electronAPI.getTransportConnectionState().catch(() => null)
+
+        // Store each attachment to disk (generates thumbnails, converts Office→markdown).
+        // [FORK] Large path-backed attachments skip storage/conversion and keep the
+        // original user-authorized path so the agent can read it with Python/xlsx tools.
         // Use allSettled so one failure doesn't kill all attachments
         const storeResults = await Promise.allSettled(
-          attachments.map(a => window.electronAPI.storeAttachment(sessionId, a))
+          attachments.map(async (attachment) => {
+            if (isPathOnlyAttachment(attachment)) {
+              if (!canUsePathOnlyAttachment(transportState)) {
+                throw new Error('Large local files cannot be sent to a remote workspace. Put the file somewhere the server can access and paste that server path instead.')
+              }
+              return createPathOnlyStoredAttachment(attachment, createAttachmentId())
+            }
+
+            return window.electronAPI.storeAttachment(sessionId, attachment)
+          })
         )
 
         // Filter successful stores, warn about failures
@@ -1462,8 +1484,13 @@ export default function App() {
           console.warn(`${failedCount} attachment(s) failed to store`)
           // Add warning message to session so user knows some attachments weren't included
           const failedNames = attachments
-            .filter((_, i) => storeResults[i].status === 'rejected')
-            .map(a => a.name)
+            .map((a, i) => {
+              const result = storeResults[i]
+              if (result.status !== 'rejected') return null
+              const reason = result.reason instanceof Error ? result.reason.message : String(result.reason ?? '')
+              return reason ? `${a.name} (${reason})` : a.name
+            })
+            .filter((value): value is string => Boolean(value))
             .join(', ')
           updateSessionById(sessionId, (s) => ({
             messages: [...s.messages, {
@@ -1499,6 +1526,13 @@ export default function App() {
             }
           })
         )
+
+        // [FORK] If every attachment was rejected and there is no text, the
+        // warning inserted above is the whole user-visible result. Avoid sending
+        // an empty turn to the backend.
+        if (processedAttachments.length === 0 && !message.trim()) {
+          return
+        }
       }
 
       // Step 3: Extract badges from mentions (sources/skills) with embedded icons

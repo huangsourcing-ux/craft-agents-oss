@@ -1,5 +1,10 @@
 # Fork Changes
 
+## 2026-07-08
+
+- [FORK] Simplified the Electron and WebUI employee login screens to keep the existing WudiBuddy logo while showing only the minimal account, password, placeholder, and `登录WudiBuddy Agents` copy in the default form state.
+- [FORK] Added path-only handling for large local attachments. Files over the existing 20 MB inline limit that come from the OS file picker or drag-drop keep their user-authorized filesystem path instead of being base64-encoded and pre-converted, so large Excel workbooks can be handled by agent-side Python/xlsx tooling.
+
 ## 2026-07-07
 
 - [FORK] Changed employee managed mode from "remote workspace" to "local workspace + server-managed model proxy". Employee login now syncs the `system-openrouter` LLM connection through auth-gateway and keeps the current local workspace selected.

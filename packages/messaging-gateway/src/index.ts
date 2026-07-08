@@ -1,7 +1,7 @@
 /**
  * @craft-agent/messaging-gateway
  *
- * Messaging gateway for WudiBuddy Agents — Telegram & WhatsApp.
+ * Messaging gateway for WudiBuddy Agents — Telegram, WhatsApp, Lark, and WeCom.
  */
 
 export { MessagingGateway, type GatewayOptions } from './gateway'
@@ -11,6 +11,13 @@ export {
   type WhatsAppConfig,
   type WhatsAppEvent,
 } from './adapters/whatsapp/index'
+export {
+  DEFAULT_WECOM_WS_URL,
+  WeComAdapter,
+  parseWeComCredentials,
+  testWeComCredentials,
+  type WeComCredentials,
+} from './adapters/wecom/index'
 export { BindingStore } from './binding-store'
 export { ConfigStore } from './config-store'
 export { PairingCodeManager, PAIRING_TTL_MS, PAIRING_RATE_LIMIT_PER_MINUTE } from './pairing'

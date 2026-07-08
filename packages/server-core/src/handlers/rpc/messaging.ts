@@ -10,6 +10,7 @@ import type {
   MessagingPendingRejectReason,
   MessagingPlatformAccessMode,
   MessagingPlatformOwnerInfo,
+  WeComCredentialInput,
 } from '../messaging-registry-interface'
 
 export function registerMessagingHandlers(server: RpcServer, deps: HandlerDeps): void {
@@ -50,6 +51,22 @@ export function registerMessagingHandlers(server: RpcServer, deps: HandlerDeps):
   ) => {
     if (!ctx.workspaceId) throw new Error('Missing workspaceId')
     await registry.saveLarkCredentials(ctx.workspaceId, creds)
+    return { success: true }
+  })
+
+  server.handle(RPC_CHANNELS.messaging.TEST_WECOM, async (
+    _ctx,
+    creds: WeComCredentialInput,
+  ) => {
+    return registry.testWeComCredentials(creds)
+  })
+
+  server.handle(RPC_CHANNELS.messaging.SAVE_WECOM, async (
+    ctx,
+    creds: WeComCredentialInput,
+  ) => {
+    if (!ctx.workspaceId) throw new Error('Missing workspaceId')
+    await registry.saveWeComCredentials(ctx.workspaceId, creds)
     return { success: true }
   })
 

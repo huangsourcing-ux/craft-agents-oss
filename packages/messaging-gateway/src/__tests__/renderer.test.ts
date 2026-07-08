@@ -570,3 +570,59 @@ describe('Renderer — WhatsApp desktop-only approvals', () => {
     expect(sends[0]!.text).toContain('desktop app')
   })
 })
+
+describe('Renderer — WeCom desktop-only prompts', () => {
+  it('permission_request on WeCom sends an informational desktop-only message', async () => {
+    const renderer = new Renderer()
+    const adapter = makeAdapter({ inlineButtons: false, messageEditing: false, markdown: 'wecom-markdown' })
+    ;(adapter as any).platform = 'wecom'
+    const binding = {
+      ...makeBinding({ approvalChannel: 'chat' }),
+      platform: 'wecom' as const,
+      channelId: 'wecom-1',
+    }
+
+    await renderer.handle(
+      {
+        type: 'permission_request',
+        sessionId: 's',
+        request: {
+          requestId: 'r1',
+          toolName: 'bash',
+          description: 'run tests',
+        },
+      } as SessionEvent,
+      binding,
+      adapter,
+    )
+
+    expect(adapter.calls.filter((c) => c.kind === 'sendButtons')).toHaveLength(0)
+    const sends = adapter.calls.filter((c) => c.kind === 'sendText')
+    expect(sends).toHaveLength(1)
+    expect(sends[0]!.text).toContain('desktop app')
+  })
+
+  it('credential_request on WeCom sends an informational desktop-only message', async () => {
+    const renderer = new Renderer()
+    const adapter = makeAdapter({ inlineButtons: false, messageEditing: false, markdown: 'wecom-markdown' })
+    ;(adapter as any).platform = 'wecom'
+    const binding = {
+      ...makeBinding(),
+      platform: 'wecom' as const,
+      channelId: 'wecom-1',
+    }
+
+    await renderer.handle(
+      {
+        type: 'credential_request',
+        sessionId: 's',
+      } as SessionEvent,
+      binding,
+      adapter,
+    )
+
+    const sends = adapter.calls.filter((c) => c.kind === 'sendText')
+    expect(sends).toHaveLength(1)
+    expect(sends[0]!.text).toContain('desktop app')
+  })
+})

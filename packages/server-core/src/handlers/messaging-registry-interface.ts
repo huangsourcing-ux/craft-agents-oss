@@ -88,6 +88,12 @@ export type MessagingPlatformAccessMode = 'open' | 'owner-only'
 
 export type MessagingBindingAccessMode = 'inherit' | 'allow-list' | 'open'
 
+export interface WeComCredentialInput {
+  botId: string
+  secret: string
+  wsUrl?: string
+}
+
 export interface MessagingConfigInfo {
   enabled: boolean
   /**
@@ -101,6 +107,9 @@ export interface MessagingConfigInfo {
         supergroup?: MessagingSupergroupInfo
         accessMode?: MessagingPlatformAccessMode
         owners?: MessagingPlatformOwnerInfo[]
+        domain?: 'lark' | 'feishu'
+        selfChatMode?: boolean
+        wsUrl?: string
       }
     | undefined
   >
@@ -190,6 +199,12 @@ export interface IMessagingGatewayRegistry {
     appSecret: string
     domain: 'lark' | 'feishu'
   }): Promise<void>
+
+  /** Test WeCom smart bot credentials by opening a short-lived WebSocket connection. */
+  testWeComCredentials(creds: WeComCredentialInput): Promise<{ success: boolean; error?: string }>
+
+  /** Save WeCom credentials and (re)initialize the adapter. */
+  saveWeComCredentials(workspaceId: string, creds: WeComCredentialInput): Promise<void>
 
   /** Disable a platform for a workspace, preserving WhatsApp auth state unless forgotten separately. */
   disconnectPlatform(workspaceId: string, platform: string): Promise<void>

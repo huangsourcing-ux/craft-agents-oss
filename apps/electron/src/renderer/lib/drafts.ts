@@ -4,6 +4,8 @@
  * Two tracks, chosen per attachment at save time:
  *   - Track P (path-backed): absolute OS path captured via webUtils.getPathForFile.
  *     Persist just `{path, name}`. Re-read on hydrate via the readUserAttachment RPC.
+ *     Large path-only refs also persist lightweight type/size metadata so hydrate
+ *     can restore the chip without reading a huge file back into memory.
  *   - Track C (content-backed): no real path exists (paste, web-drag). Persist the
  *     bytes inline in `ref.content`. Hydrate reconstructs the FileAttachment from
  *     the stored bytes, no disk read.
@@ -58,6 +60,12 @@ function buildContent(a: FileAttachment): DraftAttachmentContent {
  */
 export function toDraftRef(a: FileAttachment): DraftAttachmentRef | null {
   if (isAbsolutePath(a.path)) {
+    // [FORK] Large attachments can be intentionally path-only. Persist just
+    // lightweight metadata with the path so draft restore avoids the legacy
+    // readUserAttachment path, which rejects/reads large files.
+    if (a.base64 === undefined && a.text === undefined) {
+      return { path: a.path, name: a.name, content: buildContent(a) }
+    }
     return { path: a.path, name: a.name }
   }
   if (estimateContentBytes(a) > CONTENT_PERSIST_CAP) {

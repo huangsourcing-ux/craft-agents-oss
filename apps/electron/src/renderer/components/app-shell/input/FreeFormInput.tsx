@@ -15,6 +15,7 @@ import {
 import { Icon_Home, Spinner } from '@craft-agent/ui'
 
 import * as storage from '@/lib/local-storage'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   InlineSlashCommand,
@@ -82,6 +83,11 @@ import {
   getRecentWorkingDirs,
   addRecentWorkingDir,
 } from './working-directory-history'
+import {
+  canUsePathOnlyAttachment,
+  createPathOnlyAttachment,
+  LARGE_ATTACHMENT_PATH_ONLY_THRESHOLD,
+} from '@/lib/large-attachments'
 import { WorkingDirectorySelector, formatPathForDisplay } from './WorkingDirectorySelector'
 import { CompactPermissionModeSelector } from './CompactPermissionModeSelector'
 import { CompactModelSelector } from './CompactModelSelector'
@@ -1135,6 +1141,28 @@ export function FreeFormInput({
     // OS drag-drop; returns null for clipboard paste and web-drag (no disk origin).
     // When null, the draft layer falls back to persisting content inline (Track C).
     const realPath = hasElectronAPI ? window.electronAPI.getFilePath?.(file) ?? null : null
+    const fileName = overrideName || file.name
+    const mimeType = file.type || ''
+
+    // [FORK] Avoid reading large path-backed files into renderer memory. Excel
+    // workbooks in the hundreds of MB are faster and safer when the agent gets
+    // the user-authorized filesystem path and chooses a streaming reader.
+    if (realPath && file.size > LARGE_ATTACHMENT_PATH_ONLY_THRESHOLD) {
+      const transportState = await window.electronAPI.getTransportConnectionState().catch(() => null)
+      if (!canUsePathOnlyAttachment(transportState)) {
+        toast.warning('Large local files cannot be attached to a remote workspace', {
+          description: `Put "${fileName}" on a path the server can access, then paste that server path into the chat.`,
+        })
+        return null
+      }
+
+      return createPathOnlyAttachment({
+        path: realPath,
+        name: fileName,
+        mimeType,
+        size: file.size,
+      })
+    }
 
     return new Promise((resolve) => {
       const reader = new FileReader()
@@ -1151,7 +1179,6 @@ export function FreeFormInput({
         const base64 = btoa(binary)
 
         let type: FileAttachment['type'] = 'unknown'
-        const fileName = overrideName || file.name
         if (file.type.startsWith('image/')) type = 'image'
         else if (file.type === 'application/pdf') type = 'pdf'
         else if (file.type.includes('text') || fileName.match(/\.(txt|md|json|js|ts|tsx|py|css|html)$/i)) type = 'text'
