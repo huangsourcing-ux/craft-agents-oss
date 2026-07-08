@@ -4,10 +4,11 @@
  */
 
 import { spawn } from "bun";
-import { existsSync, readFileSync, statSync, mkdirSync } from "fs";
+import { copyFileSync, existsSync, readFileSync, rmSync, statSync, mkdirSync } from "fs";
 import { join } from "path";
 
 const ROOT_DIR = join(import.meta.dir, "..");
+const ELECTRON_DIR = join(ROOT_DIR, "apps/electron");
 const DIST_DIR = join(ROOT_DIR, "apps/electron/dist");
 const OUTPUT_FILE = join(DIST_DIR, "main.cjs");
 const INTERCEPTOR_SOURCE = join(ROOT_DIR, "packages/shared/src/unified-network-interceptor.ts");
@@ -15,8 +16,10 @@ const INTERCEPTOR_OUTPUT = join(DIST_DIR, "interceptor.cjs");
 const SESSION_TOOLS_CORE_DIR = join(ROOT_DIR, "packages/session-tools-core");
 const SESSION_SERVER_DIR = join(ROOT_DIR, "packages/session-mcp-server");
 const SESSION_SERVER_OUTPUT = join(SESSION_SERVER_DIR, "dist/index.js");
+const SESSION_SERVER_RESOURCE_DIR = join(ELECTRON_DIR, "resources/session-mcp-server");
 const PI_AGENT_SERVER_DIR = join(ROOT_DIR, "packages/pi-agent-server");
 const PI_AGENT_SERVER_OUTPUT = join(PI_AGENT_SERVER_DIR, "dist/index.mjs");
+const PI_AGENT_SERVER_RESOURCE_DIR = join(ELECTRON_DIR, "resources/pi-agent-server");
 const WA_WORKER_DIR = join(ROOT_DIR, "packages/messaging-whatsapp-worker");
 const WA_WORKER_SOURCE = join(WA_WORKER_DIR, "src/worker.ts");
 const WA_WORKER_OUTPUT = join(WA_WORKER_DIR, "dist/worker.cjs");
@@ -257,6 +260,31 @@ async function buildPiAgentServer(): Promise<void> {
   console.log("✅ Pi agent server built successfully");
 }
 
+function copyBuiltAgentServers(): void {
+  console.log("📦 Copying bundled agent servers to Electron resources...");
+
+  rmSync(SESSION_SERVER_RESOURCE_DIR, { recursive: true, force: true });
+  mkdirSync(SESSION_SERVER_RESOURCE_DIR, { recursive: true });
+  copyFileSync(SESSION_SERVER_OUTPUT, join(SESSION_SERVER_RESOURCE_DIR, "index.js"));
+
+  if (existsSync(PI_AGENT_SERVER_OUTPUT)) {
+    rmSync(PI_AGENT_SERVER_RESOURCE_DIR, { recursive: true, force: true });
+    mkdirSync(PI_AGENT_SERVER_RESOURCE_DIR, { recursive: true });
+    copyFileSync(PI_AGENT_SERVER_OUTPUT, join(PI_AGENT_SERVER_RESOURCE_DIR, "index.mjs"));
+  }
+
+  if (!existsSync(join(SESSION_SERVER_RESOURCE_DIR, "index.js"))) {
+    console.error("❌ Session MCP server was not copied to Electron resources");
+    process.exit(1);
+  }
+  if (!existsSync(join(PI_AGENT_SERVER_RESOURCE_DIR, "index.mjs"))) {
+    console.error("❌ Pi agent server was not copied to Electron resources");
+    process.exit(1);
+  }
+
+  console.log("✅ Agent server resources copied");
+}
+
 // Build the WhatsApp worker (Baileys-backed subprocess spawned by WhatsAppAdapter)
 async function buildWhatsAppWorker(): Promise<void> {
   if (!existsSync(WA_WORKER_SOURCE)) {
@@ -327,6 +355,8 @@ async function main(): Promise<void> {
 
   // Build Pi agent server (subprocess for Pi SDK sessions)
   await buildPiAgentServer();
+
+  copyBuiltAgentServers();
 
   // Build unified network interceptor (CJS bundle for Node.js --require)
   await buildInterceptor();
