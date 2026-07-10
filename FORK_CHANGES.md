@@ -1,5 +1,11 @@
 # Fork Changes
 
+## 2026-07-09
+
+- [FORK] Updated the managed Amazon Data source guide for M5B/M6 monitoring and cookie-tool boundaries. The guide now explains server-side monitor jobs, explicit event retrieval, request budget costs, and administrator-only cookie review tool enablement.
+- [FORK] Expanded the managed Amazon Data source guide for M5A public data tools, including category products, deal products, promo codes, influencer public data, Amazon URL resolution, and no-cookie/no-monitoring boundaries.
+- [FORK] Added managed Amazon Data MCP source sync for local workspaces. Employee sessions now upsert the `wudi-amazon-data` HTTP MCP source through auth-gateway and store only the employee JWT in the local source credential store.
+
 ## 2026-07-08
 
 - [FORK] Simplified the Electron and WebUI employee login screens to keep the existing WudiBuddy logo while showing only the minimal account, password, placeholder, and `登录WudiBuddy Agents` copy in the default form state.

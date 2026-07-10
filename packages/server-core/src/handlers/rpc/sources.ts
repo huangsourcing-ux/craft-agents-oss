@@ -7,6 +7,7 @@ import { pushTyped, type RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
 
 const MANAGED_BACKEND_SOURCE_SLUG = 'wudi-backend'
+const MANAGED_AMAZON_DATA_SOURCE_SLUG = 'wudi-amazon-data'
 
 export const HANDLED_CHANNELS = [
   RPC_CHANNELS.sources.GET,
@@ -23,6 +24,10 @@ export const HANDLED_CHANNELS = [
 
 function managedBackendMcpUrl(serverUrl: string): string {
   return new URL('/api/business-mcp', serverUrl).toString().replace(/\/+$/, '')
+}
+
+function managedAmazonDataMcpUrl(serverUrl: string): string {
+  return new URL('/api/amazon-data-mcp', serverUrl).toString().replace(/\/+$/, '')
 }
 
 export function registerSourcesHandlers(server: RpcServer, deps: HandlerDeps): void {
@@ -115,8 +120,10 @@ export function registerSourcesHandlers(server: RpcServer, deps: HandlerDeps): v
       const { saveSourcePermissions } = await import('@craft-agent/shared/agent')
 
       const existing = loadSource(workspace.rootPath, MANAGED_BACKEND_SOURCE_SLUG)
+      const existingAmazonData = loadSource(workspace.rootPath, MANAGED_AMAZON_DATA_SOURCE_SLUG)
       const now = Date.now()
       const enabled = existing?.config.enabled ?? true
+      const amazonDataEnabled = existingAmazonData?.config.enabled ?? true
       const sourceConfig = {
         id: existing?.config.id ?? `${MANAGED_BACKEND_SOURCE_SLUG}_system`,
         name: 'Wudi Backend Services',
@@ -136,8 +143,28 @@ export function registerSourcesHandlers(server: RpcServer, deps: HandlerDeps): v
         createdAt: existing?.config.createdAt ?? now,
         updatedAt: now,
       }
+      const amazonDataSourceConfig = {
+        id: existingAmazonData?.config.id ?? `${MANAGED_AMAZON_DATA_SOURCE_SLUG}_system`,
+        name: 'Wudi Amazon Data',
+        slug: MANAGED_AMAZON_DATA_SOURCE_SLUG,
+        enabled: amazonDataEnabled,
+        provider: 'wudi',
+        type: 'mcp' as const,
+        mcp: {
+          transport: 'http' as const,
+          url: managedAmazonDataMcpUrl(setup.serverUrl),
+          authType: 'bearer' as const,
+        },
+        icon: existingAmazonData?.config.icon ?? 'A',
+        tagline: 'Company-managed Amazon marketplace data MCP tools.',
+        isAuthenticated: true,
+        connectionStatus: 'connected' as const,
+        createdAt: existingAmazonData?.config.createdAt ?? now,
+        updatedAt: now,
+      }
 
       saveSourceConfig(workspace.rootPath, sourceConfig)
+      saveSourceConfig(workspace.rootPath, amazonDataSourceConfig)
       saveSourceGuide(workspace.rootPath, MANAGED_BACKEND_SOURCE_SLUG, {
         raw: `# Wudi Backend Services
 
@@ -153,25 +180,54 @@ Use this source for company-provided backend services and employee-context tools
 - Prefer user-configured local MCP or API sources for personal integrations.
 `,
       })
+      saveSourceGuide(workspace.rootPath, MANAGED_AMAZON_DATA_SOURCE_SLUG, {
+        raw: `# Wudi Amazon Data
+
+Company-managed Amazon marketplace data tools exposed by the Wudi backend. These tools use your employee login session and do not store RapidAPI, OpenWeb Ninja, or Amazon provider secrets in the client.
+
+## Scope
+
+Use this source for public Amazon marketplace research: keyword search, product details, public top reviews, offers, best sellers, deals, deal products, promo codes, seller profiles, seller products, category lists, category products, influencer public profiles/posts/products, Amazon URL resolution, ASIN/GTIN conversion, and server-side public data monitors.
+
+## Guidelines
+
+- Do not ask users for RapidAPI keys, Amazon API keys, Amazon login cookies, Seller Central credentials, or browser session data.
+- Use cache-friendly requests and avoid repeated high-cost calls when a summary is enough.
+- Product offers, seller products, category products, deal products, influencer post/product tools, and Amazon URL scrape can be slower and higher cost; call them only when needed.
+- Public top reviews are not complete review scraping. If review samples are empty, report the limitation clearly.
+- The Amazon URL scrape tool only supports public Amazon marketplace URLs from allowed Amazon hosts. Do not use it for arbitrary web scraping or non-Amazon URLs.
+- Monitor jobs can consume repeated Amazon Data request quota. Create narrow jobs with a modest cadence and check monitor events explicitly; the client does not provide push reminders in this phase.
+- Full reviews, single review details, and seller reviews are hidden unless an administrator explicitly enables cookie tools on the server. Never ask users to paste Amazon cookies in chat or source settings.
+- Login-only data beyond the administrator-enabled cookie review tools is not enabled in this source.
+`,
+      })
       saveSourcePermissions(workspace.rootPath, MANAGED_BACKEND_SOURCE_SLUG, {
         version: '2026-07-07',
         allowedMcpPatterns: ['wudi_'],
       })
+      saveSourcePermissions(workspace.rootPath, MANAGED_AMAZON_DATA_SOURCE_SLUG, {
+        version: '2026-07-09',
+        allowedMcpPatterns: ['amazon_'],
+      })
 
       const source = loadSource(workspace.rootPath, MANAGED_BACKEND_SOURCE_SLUG)
       if (!source) return { success: false, error: 'Failed to load synced backend source.' }
+      const amazonDataSource = loadSource(workspace.rootPath, MANAGED_AMAZON_DATA_SOURCE_SLUG)
+      if (!amazonDataSource) return { success: false, error: 'Failed to load synced Amazon Data source.' }
 
       await getSourceCredentialManager().save(source, { value: setup.token })
+      await getSourceCredentialManager().save(amazonDataSource, { value: setup.token })
 
-      if (!existing && enabled) {
-        const workspaceConfig = loadWorkspaceConfig(workspace.rootPath)
-        if (workspaceConfig) {
-          workspaceConfig.defaults = workspaceConfig.defaults ?? {}
-          const enabledSlugs = workspaceConfig.defaults.enabledSourceSlugs ?? []
-          if (!enabledSlugs.includes(MANAGED_BACKEND_SOURCE_SLUG)) {
-            workspaceConfig.defaults.enabledSourceSlugs = [...enabledSlugs, MANAGED_BACKEND_SOURCE_SLUG]
-            saveWorkspaceConfig(workspace.rootPath, workspaceConfig)
-          }
+      const workspaceConfig = loadWorkspaceConfig(workspace.rootPath)
+      if (workspaceConfig) {
+        workspaceConfig.defaults = workspaceConfig.defaults ?? {}
+        const enabledSlugs = workspaceConfig.defaults.enabledSourceSlugs ?? []
+        const nextEnabledSlugs = new Set(enabledSlugs)
+        if (enabled) nextEnabledSlugs.add(MANAGED_BACKEND_SOURCE_SLUG)
+        if (amazonDataEnabled) nextEnabledSlugs.add(MANAGED_AMAZON_DATA_SOURCE_SLUG)
+        if (nextEnabledSlugs.size !== enabledSlugs.length) {
+          workspaceConfig.defaults.enabledSourceSlugs = [...nextEnabledSlugs]
+          saveWorkspaceConfig(workspace.rootPath, workspaceConfig)
         }
       }
 
